@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 mlua = { version = "0.5", features = ["lua53", "vendored"] }
 hound = "3.4.0"
+rubato = "0.8.0"
