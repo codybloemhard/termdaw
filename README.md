@@ -6,7 +6,6 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - Terminal playback controls (play, pause, stop, set time, dash in time)
 - Graph rendering structure
 - Vertices, each with gain and panning:
-  * Output vertex
   * Sample midi vertex (emit sample on note)
   * Lv2 midi instrument vertex
   * Sum vertex

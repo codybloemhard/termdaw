@@ -1,24 +1,55 @@
 use std::collections::{ HashMap };
 
-use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use mlua::prelude::*;
+
+mod sample;
+use sample::*;
 
 fn main() -> Result<(), String>{
     let mut sample_bank = SampleBank::new(96000);
     sample_bank.add("snare".to_owned(), "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav")?;
+    sample_bank.add("kick".to_owned(), "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")?;
+    let mut graph = Graph::new(1024);
+
+    graph.add(Vertex::new_sample_loop(sample_bank.get_sample("snare").unwrap(), 1024), "one".to_owned());
+    graph.add(Vertex::new_sample_loop(sample_bank.get_sample("kick").unwrap(), 1024), "two".to_owned());
+    graph.add(Vertex::new_sum(1024), "sum".to_owned());
+    graph.connect("one", "sum");
+    graph.connect("two", "sum");
+    println!("{}", graph.set_output("sum"));
+
+    let spec = hound::WavSpec {
+        channels: 2,
+        sample_rate: 96000,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut writer = hound::WavWriter::create("outp.wav", spec).unwrap();
+    let amplitude = i16::MAX as f32;
+    for _ in 0..800 {
+        let chunk = graph.render();
+        if chunk.is_none() { continue; }
+        let chunk = chunk.unwrap();
+        for i in 0..1024{
+            writer.write_sample((chunk.l[i] * amplitude) as i16).unwrap();
+            writer.write_sample((chunk.r[i] * amplitude) as i16).unwrap();
+        }
+    }
+
     lua_test();
     Ok(())
 }
 
-pub struct Graph{
-    vertices: Vec<Box<dyn Vertex>>,
+pub struct Graph<'a>{
+    vertices: Vec<Vertex<'a>>,
     edges: Vec<Vec<usize>>,
     names: HashMap<String, usize>,
     ran_status: Vec<bool>,
     max_buffer_len: usize,
+    output_vertex: Option<usize>,
 }
 
-impl Graph{
+impl<'a> Graph<'a>{
     pub fn new(max_buffer_len: usize) -> Self{
         Self{
             vertices: Vec::new(),
@@ -26,244 +57,154 @@ impl Graph{
             names: HashMap::new(),
             ran_status: Vec::new(),
             max_buffer_len,
+            output_vertex: None,
         }
     }
 
-    pub fn add(&mut self, node: Box<dyn Vertex>, name: String){
+    pub fn add(&mut self, node: Vertex<'a>, name: String){
         self.vertices.push(node);
+        self.ran_status.push(false);
         self.edges.push(Vec::new());
         let n = self.vertices.len() - 1;
         self.names.insert(name, n);
     }
 
-    pub fn connect(&mut self, a: usize, b: usize){
+    // TODO: check for cycles: if intoduce cycle, reject
+    fn connect_internal(&mut self, a: usize, b: usize) -> bool{
+        if a == b { return false; }
         let len = self.vertices.len();
-        if a >= len { return; }
-        if b >= len { return; }
-        self.edges[a].push(b);
+        if a >= len { return false; }
+        if b >= len { return false; }
+        // connect a to b: a -> b, a into b
+        // reverse: for such b we want to know which a's we should query
+        self.edges[b].push(a);
+        true
     }
 
-    pub fn run_vertex(&mut self, index: usize){
+    fn connect(&mut self, a: &str, b: &str) -> bool{
+        let a_res = self.names.get(a);
+        let b_res = self.names.get(b);
+        if a_res.is_none() { return false; }
+        if b_res.is_none() { return false; }
+        let a_index = *a_res.unwrap();
+        let b_index = *b_res.unwrap();
+        self.connect_internal(a_index, b_index)
+    }
+
+    fn run_vertex(&mut self, index: usize){
         if index >= self.vertices.len() { return; }
-        if !self.ran_status[index] {
-            self.ran_status[index] = true;
-            let v = &mut self.vertices[index];
-            v.generate(self.max_buffer_len, vec![]);
+        if self.ran_status[index] { return; }
+        self.ran_status[index] = true;
+        let edges = self.edges[index].clone();
+        for incoming in &edges{
+            self.run_vertex(*incoming);
         }
-    }
-}
-
-pub trait Vertex{
-    fn read_buffer(&self) -> &Sample;
-    fn generate(&mut self, len: usize, res: Vec<&Sample>);
-}
-
-pub struct SampleBank{
-    sample_rate: usize,
-    samples: Vec<Sample>,
-    names: HashMap<String, usize>,
-}
-
-impl SampleBank{
-    pub fn new(sample_rate: usize) -> Self{
-        Self{
-            sample_rate,
-            samples: Vec::new(),
-            names: HashMap::new(),
+        // Vertex buffers exist as long at the graph exists: we never delete vertices
+        // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
+        // TODO: maybe use arena? https://crates.io/crates/typed-arena
+        unsafe {
+            let ins = edges.iter().map(|incoming|{
+                &*(self.vertices[*incoming].read_buffer() as *const _)
+            }).collect::<Vec<_>>();
+            self.vertices[index].generate(self.max_buffer_len, ins);
         }
     }
 
-    pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
-        if self.names.get(&name).is_some() {
-            return Err(format!("TermDaw: SampleBank: there is already an sample with name \"{}\" present.", name));
-        }
-        let mut reader = if let Ok(reader) = hound::WavReader::open(file){
-            reader
+    pub fn set_output(&mut self, vert: &str) -> bool{
+        if let Some(index) = self.names.get(vert){
+            self.output_vertex = Some(*index);
+            true
         } else {
-            return Err(format!("TermDaw: SampleBank: could not open file {}.", file));
-        };
-        let specs = reader.spec();
-        if specs.channels != 2 {
-            return Err(format!("TermDaw: SampleBank: only stereo samples are supported yet, found {} channels.", specs.channels));
-        }
-        let sr = specs.sample_rate as usize;
-        let bd = specs.bits_per_sample;
-        let mut l = Vec::new();
-        let mut r = Vec::new();
-        let mut c = 0;
-        if specs.sample_format == hound::SampleFormat::Float{
-            for s in reader.samples::<f32>(){
-                if s.is_err() { continue; }
-                let s = s.unwrap();
-                if c == 0 {
-                    l.push(s);
-                    c = 1;
-                } else {
-                    r.push(s);
-                    c = 0;
-                }
-            }
-        } else {
-            let max = ((1 << bd) / 2 - 1) as f32;
-            for s in reader.samples::<i32>(){
-                if s.is_err() { continue; }
-                let s = s.unwrap() as f32 / max;
-                if c == 0 {
-                    l.push(s);
-                    c = 1;
-                } else {
-                    r.push(s);
-                    c = 0;
-                }
-            }
-        }
-        if sr != self.sample_rate{ // need to resample
-            // no idea what is means but comes from the example lol
-            let params = InterpolationParameters {
-                sinc_len: 256,
-                f_cutoff: 0.95,
-                interpolation: InterpolationType::Nearest,
-                oversampling_factor: 160,
-                window: WindowFunction::BlackmanHarris2,
-            };
-            let mut resampler = SincFixedIn::<f32>::new(
-                self.sample_rate as f64 / sr as f64,
-                params, l.len(), 2
-            );
-            let waves_in = vec![l, r];
-            let mut waves_out = resampler.process(&waves_in).unwrap();
-            l = std::mem::replace(&mut waves_out[0], Vec::new());
-            r = std::mem::replace(&mut waves_out[1], Vec::new());
-        }
-        match Sample::from(l, r){
-            Ok(sample) => {
-                self.samples.push(sample);
-                self.names.insert(name, self.samples.len() - 1);
-                Ok(())
-            },
-            Err(e) => {
-                Err(e)
-            }
+            false
         }
     }
 
-    pub fn get_sample(&self, name: &str) -> Option<&Sample>{
-        if let Some(index) = self.names.get(name){
-            Some(&self.samples[*index])
+    pub fn render(&mut self) -> Option<&Sample>{
+        for ran in &mut self.ran_status{
+            *ran = false;
+        }
+        if let Some(index) = self.output_vertex{
+            self.run_vertex(index);
+            Some(self.vertices[index].read_buffer())
         } else {
             None
         }
     }
 }
 
-pub struct Sample{
-    l: Vec<f32>,
-    r: Vec<f32>,
+pub enum Vertex<'a>{
+    Sum{
+        buf: Sample
+    },
+    SampleLoop{
+        sample: &'a Sample,
+        playing: bool,
+        t: usize,
+        buf: Sample,
+    },
 }
 
-impl Sample{
-    pub fn new(bl: usize) -> Self{
-        Self{
-            l: Vec::with_capacity(bl),
-            r: Vec::with_capacity(bl),
-        }
-    }
-
-    pub fn from(l: Vec<f32>, r: Vec<f32>) -> Result<Self, String>{
-        if l.len() != r.len() {
-            return Err(format!("TermDaw: Sample::from: l and r do not have the same length: {} and {}.", l.len(), r.len()));
-        }
-        if l.is_empty(){
-            return Err("TermDaw: Sample::from: l and r have length 0.".to_owned());
-        }
-        Ok(Self{ l, r })
-    }
-
-    pub fn len(&self) -> usize{
-        self.l.len()
-    }
-
-    pub fn is_empty(&self) -> bool{
-        self.l.is_empty()
-    }
-
-    pub fn clear(&mut self){
-        self.l.clear();
-        self.r.clear();
-    }
-}
-
-pub struct SumVertex{
-    buf: Sample,
-}
-
-impl SumVertex{
-    pub fn new(bl: usize) -> Self{
-        Self{
+impl<'a> Vertex<'a>{
+    fn new_sum(bl: usize) -> Self{
+        Self::Sum{
             buf: Sample::new(bl),
         }
     }
-}
 
-impl Vertex for SumVertex{
-    fn read_buffer(&self) -> &Sample{
-        &self.buf
-    }
-
-    fn generate(&mut self, len: usize, res: Vec<&Sample>){
-        self.buf.clear();
-        let len = self.buf.len().min(len);
-        for r in res{
-            let l = r.len().min(len);
-            for i in 0..l{
-                self.buf.l[i] += r.l[i];
-                self.buf.r[i] += r.r[i];
-            }
-        }
-    }
-}
-
-pub struct SampleLoopVertex<'a>{
-    sample: &'a Sample,
-    playing: bool,
-    t: usize,
-    buf: Sample,
-}
-
-impl<'a> SampleLoopVertex<'a>{
-    pub fn new(sample: &'a Sample, bl: usize) -> Self{
-        Self{
+    fn new_sample_loop(sample: &'a Sample, bl: usize) -> Self{
+        Self::SampleLoop{
             sample,
-            playing: false,
+            playing: true,
             t: 0,
             buf: Sample::new(bl),
         }
     }
 
-    pub fn set_time(&mut self, t: usize){
-        self.t = t;
+    fn set_time(&mut self, time: usize){
+        if let Self::SampleLoop { t, .. } = self{
+            *t = time;
+        }
     }
 
-    pub fn set_playing(&mut self, playing: bool){
-        self.playing = playing;
+    fn set_playing(&mut self, new_playing: bool){
+        if let Self::SampleLoop { playing, .. } = self{
+            *playing = new_playing;
+        }
     }
-}
 
-impl Vertex for SampleLoopVertex<'_>{
     fn read_buffer(&self) -> &Sample{
-        &self.buf
+        match self{
+            Self::Sum { buf } => &buf,
+            Self::SampleLoop{ buf, .. } => &buf,
+        }
     }
 
-    fn generate(&mut self, len: usize, _: Vec<&Sample>){
-        if self.playing{
-            let l = self.sample.len();
-            for i in 0..self.buf.len().min(len){
-                self.buf.l[i] = self.sample.l[(self.t + i) % l];
-                self.buf.r[i] = self.sample.r[(self.t + i) % l];
-            }
-            self.t += l;
-        } else {
-            self.buf.clear();
+    fn generate(&mut self, len: usize, res: Vec<&Sample>){
+        match self{
+            Self::Sum { buf } => {
+                buf.zero();
+                let len = buf.len().min(len);
+                for r in res{
+                    let l = r.len().min(len);
+                    for i in 0..l{
+                        buf.l[i] += r.l[i];
+                        buf.r[i] += r.r[i];
+                    }
+                }
+            },
+            Self::SampleLoop { playing, t, sample, buf } => {
+                if *playing{
+                    let l = sample.len();
+                    let len = buf.len().min(len);
+                    for i in 0..len{
+                        buf.l[i] = sample.l[(*t + i) % l];
+                        buf.r[i] = sample.r[(*t + i) % l];
+                    }
+                    *t += len;
+                } else {
+                    buf.zero();
+                }
+            },
         }
     }
 }
