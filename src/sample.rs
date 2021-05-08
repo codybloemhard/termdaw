@@ -43,6 +43,17 @@ impl Sample{
         veczero(&mut self.r);
     }
 
+    pub fn apply_angle(&mut self, angle: f32, len: usize){
+        if angle.abs() < 0.001 { return; }
+        let angle_rad = angle * 0.5 * 0.01745329;
+        let l_amp = std::f32::consts::FRAC_1_SQRT_2 * (angle_rad.cos() + angle_rad.sin());
+        let r_amp = std::f32::consts::FRAC_1_SQRT_2 * (angle_rad.cos() - angle_rad.sin());
+        for i in 0..len{
+            self.l[i] *= l_amp;
+            self.r[i] *= r_amp;
+        }
+    }
+
     pub fn apply_gain(&mut self, gain: f32, len: usize){
         if (gain - 1.0).abs() < 0.001 { return; }
         for i in 0..len.min(self.len()) {
@@ -53,7 +64,7 @@ impl Sample{
 
     pub fn scan_max(&self, len: usize) -> f32{
         let max = self.l.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
-        self.r.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).min(max)
+        self.r.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).max(max)
     }
 
     pub fn scale(&mut self, len: usize, scalar: f32){
@@ -129,7 +140,7 @@ impl SampleBank{
         }
         // normalization
         let mut max = l.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
-        max = r.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).min(max);
+        max = r.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).max(max);
         let ratio = 1.0 / max;
         l = l.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();
         r = r.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();

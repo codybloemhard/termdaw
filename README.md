@@ -7,16 +7,23 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Play back audio
 - [ ] Terminal playback controls (play, pause, stop, set time, dash in time)
 - [x] Graph rendering structure
-- [x] Vertices, each with gain:
+- Base Vertex, with:
+  - [x] Gain
+  - [x] Panning
+  - [x] Input summation
+- Vertex types
   - [x] Sum vertex
   - [x] Normalize vertex
-  - [ ] Bound normalization
-  - [ ] Panning vertex
   - [x] Sample loop vertex
   - [ ] Sample midi vertex (emit sample on note)
   - [ ] Lv2 fx vertex
   - [ ] Lv2 midi instrument vertex
-- [ ] Lua
+- Lua
   - [ ] To configure the project(sample rate, etc)
   - [ ] Load resources (samples and plugins)
   - [ ] Construct graph
+
+## Goals for later
+- [ ] Bound normalization
+- [ ] Automation
+- [ ] Midi pipeline
