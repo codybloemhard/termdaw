@@ -42,6 +42,30 @@ impl Sample{
         veczero(&mut self.l);
         veczero(&mut self.r);
     }
+
+    pub fn apply_gain(&mut self, gain: f32, len: usize){
+        if (gain - 1.0).abs() < 0.001 { return; }
+        for i in 0..len.min(self.len()) {
+            self.l[i] *= gain;
+            self.r[i] *= gain;
+        }
+    }
+
+    pub fn scan_max(&self, len: usize) -> f32{
+        let max = self.l.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
+        self.r.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).min(max)
+    }
+
+    pub fn scale(&mut self, len: usize, scalar: f32){
+        self.l.iter_mut().take(len).for_each(|sample| *sample *= scalar);
+        self.r.iter_mut().take(len).for_each(|sample| *sample *= scalar);
+    }
+
+    pub fn normalize(&mut self, len: usize){
+        let max = self.scan_max(len);
+        let scalar = 1.0 / max;
+        self.scale(len, scalar);
+    }
 }
 
 pub struct SampleBank{
@@ -103,6 +127,13 @@ impl SampleBank{
                 }
             }
         }
+        // normalization
+        let mut max = l.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
+        max = r.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).min(max);
+        let ratio = 1.0 / max;
+        l = l.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();
+        r = r.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();
+        // resampling
         if sr != self.sample_rate{ // need to resample
             // no idea what is means but comes from the example lol
             let params = InterpolationParameters {
@@ -133,7 +164,7 @@ impl SampleBank{
         }
     }
 
-    pub fn get_sample(&self, name: &str) -> Option<&Sample>{
+    pub fn get(&self, name: &str) -> Option<&Sample>{
         if let Some(index) = self.names.get(name){
             Some(&self.samples[*index])
         } else {

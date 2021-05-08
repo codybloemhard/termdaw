@@ -6,17 +6,19 @@ mod sample;
 use sample::*;
 
 fn main() -> Result<(), String>{
-    let mut sample_bank = SampleBank::new(96000);
-    sample_bank.add("snare".to_owned(), "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav")?;
-    sample_bank.add("kick".to_owned(), "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")?;
-    let mut graph = Graph::new(1024);
+    let bl = 1024;
+    let mut sb = SampleBank::new(96000);
+    sb.add("snare".to_owned(), "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav")?;
+    sb.add("kick".to_owned(), "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")?;
+    let mut g = Graph::new(bl);
 
-    graph.add(Vertex::new_sample_loop(sample_bank.get_sample("snare").unwrap(), 1024), "one".to_owned());
-    graph.add(Vertex::new_sample_loop(sample_bank.get_sample("kick").unwrap(), 1024), "two".to_owned());
-    graph.add(Vertex::new_sum(1024), "sum".to_owned());
-    graph.connect("one", "sum");
-    graph.connect("two", "sum");
-    println!("{}", graph.set_output("sum"));
+    g.add(Vertex::new(bl, 0.5, VertexExt::sample_loop(sb.get("snare").unwrap())), "one".to_owned());
+    g.add(Vertex::new(bl, 0.5, VertexExt::sample_loop(sb.get("kick").unwrap())), "two".to_owned());
+    g.add(Vertex::new(bl, 1.0, VertexExt::sum(true)), "sum".to_owned());
+    g.connect("one", "sum");
+    g.connect("two", "sum");
+    g.set_output("sum");
+    g.scan(800);
 
     let spec = hound::WavSpec {
         channels: 2,
@@ -27,7 +29,7 @@ fn main() -> Result<(), String>{
     let mut writer = hound::WavWriter::create("outp.wav", spec).unwrap();
     let amplitude = i16::MAX as f32;
     for _ in 0..800 {
-        let chunk = graph.render();
+        let chunk = g.render();
         if chunk.is_none() { continue; }
         let chunk = chunk.unwrap();
         for i in 0..1024{
@@ -91,13 +93,13 @@ impl<'a> Graph<'a>{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, index: usize){
+    fn run_vertex(&mut self, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
         let edges = self.edges[index].clone();
         for incoming in &edges{
-            self.run_vertex(*incoming);
+            self.run_vertex(*incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
         // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
@@ -106,7 +108,13 @@ impl<'a> Graph<'a>{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(self.max_buffer_len, ins);
+            self.vertices[index].generate(self.max_buffer_len, is_scan, ins);
+        }
+    }
+
+    pub fn set_time(&mut self, time: usize){
+        for v in &mut self.vertices{
+            v.set_time(time);
         }
     }
 
@@ -119,44 +127,90 @@ impl<'a> Graph<'a>{
         }
     }
 
-    pub fn render(&mut self) -> Option<&Sample>{
+    fn reset_ran_stati(&mut self){
         for ran in &mut self.ran_status{
             *ran = false;
         }
+    }
+
+    pub fn render(&mut self) -> Option<&Sample>{
+        self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
-            self.run_vertex(index);
+            self.run_vertex(index, false);
             Some(self.vertices[index].read_buffer())
         } else {
             None
         }
     }
+
+    pub fn scan(&mut self, chunks: usize){
+        let i = if let Some(index) = self.output_vertex{ index }
+        else { return; };
+        for _ in 0..chunks {
+            self.reset_ran_stati();
+            self.run_vertex(i, true);
+        }
+        self.set_time(0);
+    }
 }
 
-pub enum Vertex<'a>{
+pub struct Vertex<'a>{
+    buf: Sample,
+    gain: f32,
+    ext: VertexExt<'a>,
+}
+
+impl<'a> Vertex<'a>{
+    fn new(bl: usize, gain: f32, ext: VertexExt<'a>) -> Self{
+        Self{
+            buf: Sample::new(bl),
+            gain,
+            ext,
+        }
+    }
+
+    fn set_time(&mut self, t: usize){
+        self.ext.set_time(t);
+    }
+
+    fn set_gain(&mut self, gain: f32){
+        self.gain = gain;
+    }
+
+    fn read_buffer(&self) -> &Sample{
+        &self.buf
+    }
+
+    fn generate(&mut self, len: usize, is_scan: bool, res: Vec<&Sample>){
+        self.ext.generate(self.gain, &mut self.buf, len, res, is_scan);
+    }
+}
+
+pub enum VertexExt<'a>{
     Sum{
-        buf: Sample
+        normalize: bool,
+        max: f32,
     },
     SampleLoop{
         sample: &'a Sample,
         playing: bool,
         t: usize,
-        buf: Sample,
     },
 }
 
-impl<'a> Vertex<'a>{
-    fn new_sum(bl: usize) -> Self{
+impl<'a> VertexExt<'a>{
+    fn sum(normalize: bool) -> Self{
         Self::Sum{
-            buf: Sample::new(bl),
+            normalize,
+            max: 0.0, // value on scan
         }
     }
 
-    fn new_sample_loop(sample: &'a Sample, bl: usize) -> Self{
+    fn sample_loop(sample: &'a Sample) -> Self{
         Self::SampleLoop{
             sample,
             playing: true,
             t: 0,
-            buf: Sample::new(bl),
         }
     }
 
@@ -172,40 +226,50 @@ impl<'a> Vertex<'a>{
         }
     }
 
-    fn read_buffer(&self) -> &Sample{
+    fn generate(&mut self, gain: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
         match self{
-            Self::Sum { buf } => &buf,
-            Self::SampleLoop{ buf, .. } => &buf,
+            Self::Sum { normalize, max } => {
+                sum_gen(gain, buf, len, res, *normalize, max, is_scan);
+            },
+            Self::SampleLoop { playing, t, sample } => {
+                sample_loop_gen(gain, buf, len, playing, t, sample);
+            },
         }
     }
+}
 
-    fn generate(&mut self, len: usize, res: Vec<&Sample>){
-        match self{
-            Self::Sum { buf } => {
-                buf.zero();
-                let len = buf.len().min(len);
-                for r in res{
-                    let l = r.len().min(len);
-                    for i in 0..l{
-                        buf.l[i] += r.l[i];
-                        buf.r[i] += r.r[i];
-                    }
-                }
-            },
-            Self::SampleLoop { playing, t, sample, buf } => {
-                if *playing{
-                    let l = sample.len();
-                    let len = buf.len().min(len);
-                    for i in 0..len{
-                        buf.l[i] = sample.l[(*t + i) % l];
-                        buf.r[i] = sample.r[(*t + i) % l];
-                    }
-                    *t += len;
-                } else {
-                    buf.zero();
-                }
-            },
+fn sum_gen(gain: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, normalize: bool, max: &mut f32, is_scan: bool){
+    buf.zero();
+    let len = buf.len().min(len);
+    for r in res{
+        let l = r.len().min(len);
+        for i in 0..l{
+            buf.l[i] += r.l[i];
+            buf.r[i] += r.r[i];
         }
+    }
+    if normalize{
+        if is_scan{
+            *max = buf.scan_max(len).max(*max);
+        } else {
+            buf.scale(len, 1.0 / *max);
+        }
+        println!("max: {}", max);
+    }
+    buf.apply_gain(gain, len);
+}
+
+fn sample_loop_gen(gain: f32, buf: &mut Sample, len: usize, playing: &mut bool, t: &mut usize, sample: &Sample){
+    if *playing{
+        let l = sample.len();
+        let len = buf.len().min(len);
+        for i in 0..len{
+            buf.l[i] = sample.l[(*t + i) % l] * gain;
+            buf.r[i] = sample.r[(*t + i) % l] * gain;
+        }
+        *t += len;
+    } else {
+        buf.zero();
     }
 }
 
