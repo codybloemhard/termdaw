@@ -73,9 +73,32 @@ impl Sample{
     }
 
     pub fn normalize(&mut self, len: usize){
+        let len = len.min(self.len());
         let max = self.scan_max(len);
         let scalar = 1.0 / max;
         self.scale(len, scalar);
+    }
+    //Not for chunks!
+    pub fn resample(&self, from: usize, to: usize) -> Sample{
+        // no idea what is means but comes from the example lol
+        let params = InterpolationParameters {
+            sinc_len: 256,
+            f_cutoff: 0.95,
+            interpolation: InterpolationType::Nearest,
+            oversampling_factor: 160,
+            window: WindowFunction::BlackmanHarris2,
+        };
+        let mut resampler = SincFixedIn::<f32>::new(
+            to as f64 / from as f64,
+            params, self.len(), 2
+        );
+        let waves_in = vec![self.l.clone(), self.r.clone()];
+        let mut waves_out = resampler.process(&waves_in).unwrap();
+        let l = std::mem::replace(&mut waves_out[0], Vec::new());
+        let r = std::mem::replace(&mut waves_out[1], Vec::new());
+        Self{
+            l, r
+        }
     }
 }
 
@@ -83,6 +106,8 @@ pub struct SampleBank{
     sample_rate: usize,
     samples: Vec<Sample>,
     names: HashMap<String, usize>,
+    max_sr: usize,
+    max_bd: usize,
 }
 
 impl SampleBank{
@@ -91,7 +116,18 @@ impl SampleBank{
             sample_rate,
             samples: Vec::new(),
             names: HashMap::new(),
+            max_sr: 0,
+            max_bd: 0,
         }
+    }
+
+    pub fn reset(&mut self, new_rate: usize){
+        if self.sample_rate == new_rate { return; }
+        self.sample_rate = new_rate;
+        self.samples.clear();
+        self.names.clear();
+        self.max_sr = 0;
+        self.max_bd = 0;
     }
 
     pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
@@ -109,6 +145,11 @@ impl SampleBank{
         }
         let sr = specs.sample_rate as usize;
         let bd = specs.bits_per_sample;
+        self.max_sr = self.max_sr.max(sr);
+        self.max_bd = self.max_bd.max(bd as usize);
+        if sr > self.sample_rate {
+            println!("TermDaw: warning: sample \"{}\" has a higher samplerate({}) than the project({}).", name, sr, self.sample_rate);
+        }
         let mut l = Vec::new();
         let mut r = Vec::new();
         let mut c = 0;
@@ -138,41 +179,18 @@ impl SampleBank{
                 }
             }
         }
-        // normalization
-        let mut max = l.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
-        max = r.iter().map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).max(max);
-        let ratio = 1.0 / max;
-        l = l.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();
-        r = r.into_iter().map(|sample| sample * ratio).collect::<Vec<_>>();
+        let mut sample = match Sample::from(l, r){
+            Ok(sample) => { sample },
+            Err(e) => { return Err(e); }
+        };
+        sample.normalize(usize::MAX);
         // resampling
         if sr != self.sample_rate{ // need to resample
-            // no idea what is means but comes from the example lol
-            let params = InterpolationParameters {
-                sinc_len: 256,
-                f_cutoff: 0.95,
-                interpolation: InterpolationType::Nearest,
-                oversampling_factor: 160,
-                window: WindowFunction::BlackmanHarris2,
-            };
-            let mut resampler = SincFixedIn::<f32>::new(
-                self.sample_rate as f64 / sr as f64,
-                params, l.len(), 2
-            );
-            let waves_in = vec![l, r];
-            let mut waves_out = resampler.process(&waves_in).unwrap();
-            l = std::mem::replace(&mut waves_out[0], Vec::new());
-            r = std::mem::replace(&mut waves_out[1], Vec::new());
+            sample = sample.resample(sr, self.sample_rate);
         }
-        match Sample::from(l, r){
-            Ok(sample) => {
-                self.samples.push(sample);
-                self.names.insert(name, self.samples.len() - 1);
-                Ok(())
-            },
-            Err(e) => {
-                Err(e)
-            }
-        }
+        self.samples.push(sample);
+        self.names.insert(name, self.samples.len() - 1);
+        Ok(())
     }
 
     pub fn get(&self, name: &str) -> Option<&Sample>{
@@ -181,6 +199,10 @@ impl SampleBank{
         } else {
             None
         }
+    }
+
+    pub fn get_max_sr_bd(&self) -> (usize, usize){
+        (self.max_sr, self.max_bd)
     }
 }
 

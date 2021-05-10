@@ -4,6 +4,8 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 
 ## MVP Goals
 - [x] Render audio
+  - Any samplerate: will up or down sample from project rate
+  - 8, 16, 24 or 32 bit bitdepth
 - [ ] Play back audio
 - [ ] Terminal playback controls (play, pause, stop, set time, dash in time)
 - [x] Graph rendering structure
@@ -27,3 +29,4 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Bound normalization
 - [ ] Automation
 - [ ] Midi pipeline
+- [ ] Mono support
