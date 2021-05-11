@@ -1,5 +1,9 @@
+use std::fs::File;
+use std::io::prelude::*;
+
 use mlua::prelude::*;
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
+use serde::Deserialize;
 
 mod sample;
 mod graph;
@@ -7,26 +11,33 @@ use sample::*;
 use graph::*;
 
 fn main() -> Result<(), String>{
+    let mut file = File::open("project.toml").unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    let config: Config = toml::from_str(&contents).unwrap();
+    std::mem::drop(file);
+
+    let name = config.project.name;
+    let main = config.settings.main;
+    let bl = config.settings.buffer_length;
+    let psr = config.settings.project_samplerate;
+    println!("TermDaw: loading \"{}\" with \n\tbuffer_length = {} \n\tproject_samplerate = {} \n\tmain = \"{}\"", name, bl, psr, main);
+
+    let mut file = File::open(&main).unwrap();
+    contents.clear();
+    file.read_to_string(&mut contents).unwrap();
+    std::mem::drop(file);
+
     let lua = Lua::new();
 
-    let bl = 1024;
-    let psr = 48000;
     let mut cs = 0;
     let mut render_sr = 48000;
     let mut bd = 16;
+    let mut output_vertex = String::new();
+    let mut output_file = String::from("outp.wav");
 
     let mut sb = SampleBank::new(psr);
     let mut g = Graph::new(bl);
-
-    let vertices_lua = r#"
-        set_length(3.0);
-        set_render_samplerate(44100);
-        load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav");
-        load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")
-        add_sampleloop("one", 1.0, 0.0, "snare");
-        add_sampleloop("two", 1.0, 0.0, "kick");
-        add_normalize("sum", 1.0, 0.0);
-        "#;
 
     let mut samples_to_load = Vec::new();
     let mut seeds_sum = Vec::new();
@@ -35,6 +46,7 @@ fn main() -> Result<(), String>{
     let mut connections = Vec::new();
 
     lua.scope(|scope| {
+        // ---- Settings
         lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
             cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
             Ok(())
@@ -47,11 +59,17 @@ fn main() -> Result<(), String>{
             bd = new_bd;
             Ok(())
         })?)?;
+        lua.globals().set("set_output_file", scope.create_function_mut(|_, out: String| {
+            output_file = out;
+            Ok(())
+        })?)?;
+        // ---- Resources
         // load_sample(name, file)
         lua.globals().set("load_sample", scope.create_function_mut(|_, seed: (String, String)| {
             samples_to_load.push(seed);
             Ok(())
         })?)?;
+        // ---- Graph
         // add_sum(name, gain, angle)
         lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
             seeds_sum.push(seed);
@@ -72,7 +90,11 @@ fn main() -> Result<(), String>{
             connections.push(seed);
             Ok(())
         })?)?;
-        lua.load(vertices_lua).exec()
+        lua.globals().set("set_output", scope.create_function_mut(|_, out: String| {
+            output_vertex = out;
+            Ok(())
+        })?)?;
+        lua.load(&contents).exec()
     }).unwrap();
 
     for (name, file) in samples_to_load { sb.add(name, &file)?; }
@@ -81,14 +103,35 @@ fn main() -> Result<(), String>{
     for (name, gain, angle, sample) in seeds_sl { g.add(Vertex::new(bl, gain, angle, VertexExt::sample_loop(sb.get(&sample).unwrap())), name); }
     for (a, b) in connections { g.connect(&a, &b); }
 
-    g.connect("one", "sum");
-    g.connect("two", "sum");
-    g.set_output("sum");
+    g.set_output(&output_vertex);
     if !g.check_graph(){
-        return Err("TermDaw: no output vertex found.".to_owned());
+        return Err("TermDaw: graph check failed.".to_owned());
     }
     g.scan(cs);
 
+    render((psr, render_sr, bd, bl, cs), &output_file, &sb, &mut g);
+    Ok(())
+}
+
+#[derive(Deserialize)]
+struct Config{
+    project: Project,
+    settings: Settings,
+}
+
+#[derive(Deserialize)]
+struct Project{
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct Settings{
+    buffer_length: usize,
+    project_samplerate: usize,
+    main: String,
+}
+
+fn render((psr, render_sr, bd, bl, cs): (usize, usize, usize, usize, usize), output_file: &str, sb: &SampleBank, g: &mut Graph) {
     let (msr, mbd) = sb.get_max_sr_bd();
     if psr > render_sr{
         println!("TermDaw: warning: render will down sample from {}(project s.r.) to {}.", psr, render_sr);
@@ -106,7 +149,7 @@ fn main() -> Result<(), String>{
         bits_per_sample: bd as u16,
         sample_format: hound::SampleFormat::Int,
     };
-    let mut writer = hound::WavWriter::create("outp.wav", spec).unwrap();
+    let mut writer = hound::WavWriter::create(output_file, spec).unwrap();
     let amplitude = if bd < 32 { ((1 << (bd - 1)) - 1) as f32 }
     else { i32::MAX as f32 };
     fn write_16s<T: std::io::Write + std::io::Seek>(writer: &mut hound::WavWriter<T>, l: &[f32], r: &[f32], len: usize, amplitude: f32){
@@ -151,30 +194,4 @@ fn main() -> Result<(), String>{
             else { write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
         }
     }
-
-    Ok(())
 }
-
-// fn lua_test() -> LuaResult<()> {
-//     let lua = Lua::new();
-//
-//     let map_table = lua.create_table()?;
-//
-//     let greet = lua.create_function(|_, name: String| {
-//         println!("Hello, {}!", name);
-//         Ok(())
-//     });
-//
-//     map_table.set(1, "one")?;
-//     map_table.set("two", 2)?;
-//
-//     lua.globals().set("map_table", map_table)?;
-//     lua.globals().set("greet", greet.unwrap())?;
-//
-//     lua.load("for k,v in pairs(map_table) do print(k,v) end").exec()?;
-//     lua.load("greet(\"haha yes\")").exec()?;
-//
-//     println!("Hello, world!");
-//     Ok(())
-// }
-

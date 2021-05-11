@@ -59,8 +59,14 @@ impl<'a> Graph<'a>{
     pub fn connect(&mut self, a: &str, b: &str) -> bool{
         let a_res = self.name_map.get(a);
         let b_res = self.name_map.get(b);
-        if a_res.is_none() { return false; }
-        if b_res.is_none() { return false; }
+        if a_res.is_none() {
+            println!("TermDaw: warning: vertex \"{}\" cannot be found and thus can't be connected.", a);
+            return false;
+        }
+        if b_res.is_none() {
+            println!("TermDaw: warning: vertex \"{}\" cannot be found and thus can't be connected to.", b);
+            return false;
+        }
         let a_index = *a_res.unwrap();
         let b_index = *b_res.unwrap();
         self.connect_internal(a_index, b_index)
@@ -102,7 +108,14 @@ impl<'a> Graph<'a>{
 
     pub fn check_graph(&self) -> bool{
         let output = if let Some(out) = self.output_vertex{ out }
-        else { return false; };
+        else {
+            println!("TermDaw: error: output vertex not found.");
+            return false;
+        };
+        if self.edges[output].is_empty(){
+            println!("TermDaw: error: output receives no inputs.");
+            return false;
+        }
         let mut set = vec![false; self.vertices.len()];
         fn find_connected_component(x: usize, edges: &[Vec<usize>], set: &mut Vec<bool>){
             set[x] = true;

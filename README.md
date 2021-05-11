@@ -13,9 +13,11 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
     - [ ] Controls: set time, dash in time
     - [ ] Controls: refresh, render
     - [ ] View: Terminal logging, warnings, errors, colors
-- [x] Sample Bank
-- [x] Graph rendering structure
-- [ ] Midi Bank
+    - [x] Toml settings
+- Structure
+  - [x] Sample Bank
+  - [x] Graph rendering structure
+  - [ ] Midi Bank
 - Base Vertex, with:
   - [x] Gain
   - [x] Panning

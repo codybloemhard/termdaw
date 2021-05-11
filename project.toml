@@ -1,0 +1,8 @@
+[project]
+name = "Example Project"
+
+[settings]
+buffer_length = 1024
+project_samplerate = 48000
+main = "project.lua"
+
