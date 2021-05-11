@@ -192,7 +192,6 @@ impl<'a> Vertex<'a>{
 pub enum VertexExt<'a>{
     Sum,
     Normalize{
-        normalize: bool,
         max: f32,
     },
     SampleLoop{
@@ -207,9 +206,8 @@ impl<'a> VertexExt<'a>{
         Self::Sum
     }
 
-    pub fn normalize(normalize: bool) -> Self{
+    pub fn normalize() -> Self{
         Self::Normalize{
-            normalize,
             max: 0.0, // value on scan
         }
     }
@@ -233,8 +231,8 @@ impl<'a> VertexExt<'a>{
             Self::Sum => {
                 sum_gen(buf, len, res);
             },
-            Self::Normalize { normalize, max } => {
-                normalize_gen(buf, len, res, *normalize, max, is_scan);
+            Self::Normalize { max } => {
+                normalize_gen(buf, len, res, max, is_scan);
             },
             Self::SampleLoop { playing, t, sample } => {
                 sample_loop_gen(buf, len, playing, t, sample);
@@ -268,14 +266,12 @@ fn sum_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>){
     sum_inputs(buf, len, res);
 }
 
-fn normalize_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, normalize: bool, max: &mut f32, is_scan: bool){
+fn normalize_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, max: &mut f32, is_scan: bool){
     sum_inputs(buf, len, res);
-    if normalize{
-        if is_scan{
-            *max = buf.scan_max(len).max(*max);
-        } else {
-            buf.scale(len, 1.0 / *max);
-        }
+    if is_scan{
+        *max = buf.scan_max(len).max(*max);
+    } else {
+        buf.scale(len, 1.0 / *max);
     }
 }
 

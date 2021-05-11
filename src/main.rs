@@ -7,36 +7,80 @@ use sample::*;
 use graph::*;
 
 fn main() -> Result<(), String>{
-    let setup_lua = "set_length(3.0)\nset_render_samplerate(44100)";
     let lua = Lua::new();
 
-    let (bl, psr, cs, render_sr, bd) = {
-        let mut bl = 1024;
-        let mut psr = 48000;
-        let mut frames = 0;
-        let mut render_sr = 48000;
-        let mut bd = 16;
-        lua.scope(|scope| {
-            lua.globals().set("set_bufferlen", scope.create_function_mut(|_, new_bl: usize| { bl = new_bl; Ok(()) })?,)?;
-            lua.globals().set("set_samplerate", scope.create_function_mut(|_, new_sr: usize| { psr = new_sr; Ok(()) })?,)?;
-            lua.globals().set("set_length", scope.create_function_mut(|_, new_frames: usize| { frames = new_frames; Ok(()) })?,)?;
-            lua.globals().set("set_render_samplerate", scope.create_function_mut(|_, new_sr: usize| { render_sr = new_sr; Ok(()) })?,)?;
-            lua.globals().set("set_render_bitdepth", scope.create_function_mut(|_, new_bd: usize| { bd = new_bd; Ok(()) })?,)?;
-            lua.load(setup_lua).exec()
-        }).unwrap();
-        (bl, psr, ((psr * frames) as f32 / bl as f32).ceil() as usize, render_sr, bd)
-    };
-
-    println!("{}", render_sr);
+    let bl = 1024;
+    let psr = 48000;
+    let mut cs = 0;
+    let mut render_sr = 48000;
+    let mut bd = 16;
 
     let mut sb = SampleBank::new(psr);
-    sb.add("snare".to_owned(), "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav")?;
-    sb.add("kick".to_owned(), "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")?;
     let mut g = Graph::new(bl);
 
-    g.add(Vertex::new(bl, 1.0, 0.0, VertexExt::sample_loop(sb.get("snare").unwrap())), "one".to_owned());
-    g.add(Vertex::new(bl, 1.0, 0.0, VertexExt::sample_loop(sb.get("kick").unwrap())), "two".to_owned());
-    g.add(Vertex::new(bl, 1.0, 0.0, VertexExt::normalize(true)), "sum".to_owned());
+    let vertices_lua = r#"
+        set_length(3.0);
+        set_render_samplerate(44100);
+        load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav");
+        load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav")
+        add_sampleloop("one", 1.0, 0.0, "snare");
+        add_sampleloop("two", 1.0, 0.0, "kick");
+        add_normalize("sum", 1.0, 0.0);
+        "#;
+
+    let mut samples_to_load = Vec::new();
+    let mut seeds_sum = Vec::new();
+    let mut seeds_norm = Vec::new();
+    let mut seeds_sl = Vec::new();
+    let mut connections = Vec::new();
+
+    lua.scope(|scope| {
+        lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
+            cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
+            Ok(())
+        })?)?;
+        lua.globals().set("set_render_samplerate", scope.create_function_mut(|_, new_sr: usize| {
+            render_sr = new_sr;
+            Ok(())
+        })?)?;
+        lua.globals().set("set_render_bitdepth", scope.create_function_mut(|_, new_bd: usize| {
+            bd = new_bd;
+            Ok(())
+        })?)?;
+        // load_sample(name, file)
+        lua.globals().set("load_sample", scope.create_function_mut(|_, seed: (String, String)| {
+            samples_to_load.push(seed);
+            Ok(())
+        })?)?;
+        // add_sum(name, gain, angle)
+        lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
+            seeds_sum.push(seed);
+            Ok(())
+        })?)?;
+        // add_normalize(name, gain, angle)
+        lua.globals().set("add_normalize", scope.create_function_mut(|_, seed: (String, f32, f32)| {
+            seeds_norm.push(seed);
+            Ok(())
+        })?)?;
+        // add_sampleloop(name, gain, angle, sample)
+        lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
+            seeds_sl.push(seed);
+            Ok(())
+        })?)?;
+        // connect(name, name)
+        lua.globals().set("connect", scope.create_function_mut(|_, seed: (String, String)| {
+            connections.push(seed);
+            Ok(())
+        })?)?;
+        lua.load(vertices_lua).exec()
+    }).unwrap();
+
+    for (name, file) in samples_to_load { sb.add(name, &file)?; }
+    for (name, gain, angle) in seeds_sum { g.add(Vertex::new(bl, gain, angle, VertexExt::sum()), name); }
+    for (name, gain, angle) in seeds_norm { g.add(Vertex::new(bl, gain, angle, VertexExt::normalize()), name); }
+    for (name, gain, angle, sample) in seeds_sl { g.add(Vertex::new(bl, gain, angle, VertexExt::sample_loop(sb.get(&sample).unwrap())), name); }
+    for (a, b) in connections { g.connect(&a, &b); }
+
     g.connect("one", "sum");
     g.connect("two", "sum");
     g.set_output("sum");

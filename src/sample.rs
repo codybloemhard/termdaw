@@ -121,15 +121,6 @@ impl SampleBank{
         }
     }
 
-    pub fn reset(&mut self, new_rate: usize){
-        if self.sample_rate == new_rate { return; }
-        self.sample_rate = new_rate;
-        self.samples.clear();
-        self.names.clear();
-        self.max_sr = 0;
-        self.max_bd = 0;
-    }
-
     pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
         if self.names.get(&name).is_some() {
             return Err(format!("TermDaw: SampleBank: there is already an sample with name \"{}\" present.", name));
