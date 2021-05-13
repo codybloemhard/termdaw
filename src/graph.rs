@@ -1,9 +1,9 @@
-use crate::sample::{ Sample };
+use crate::sample::{ Sample, SampleBank };
 
 use std::collections::{ HashMap };
 
-pub struct Graph<'a>{
-    vertices: Vec<Vertex<'a>>,
+pub struct Graph{
+    vertices: Vec<Vertex>,
     edges: Vec<Vec<usize>>,
     names: Vec<String>,
     name_map: HashMap<String, usize>,
@@ -12,7 +12,7 @@ pub struct Graph<'a>{
     output_vertex: Option<usize>,
 }
 
-impl<'a> Graph<'a>{
+impl Graph{
     pub fn new(max_buffer_len: usize) -> Self{
         Self{
             vertices: Vec::new(),
@@ -25,7 +25,16 @@ impl<'a> Graph<'a>{
         }
     }
 
-    pub fn add(&mut self, node: Vertex<'a>, name: String){
+    pub fn reset(&mut self){
+        self.vertices.clear();
+        self.edges.clear();
+        self.name_map.clear();
+        self.names.clear();
+        self.ran_status.clear();
+        self.output_vertex = None;
+    }
+
+    pub fn add(&mut self, node: Vertex, name: String){
         self.vertices.push(node);
         self.ran_status.push(false);
         self.edges.push(Vec::new());
@@ -72,13 +81,13 @@ impl<'a> Graph<'a>{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, index: usize, is_scan: bool){
+    fn run_vertex(&mut self, sb: &SampleBank, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
         let edges = self.edges[index].clone();
         for incoming in &edges{
-            self.run_vertex(*incoming, is_scan);
+            self.run_vertex(sb, *incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
         // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
@@ -87,7 +96,7 @@ impl<'a> Graph<'a>{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(self.max_buffer_len, is_scan, ins);
+            self.vertices[index].generate(sb, self.max_buffer_len, is_scan, ins);
         }
     }
 
@@ -137,36 +146,36 @@ impl<'a> Graph<'a>{
         }
     }
 
-    pub fn render(&mut self) -> Option<&Sample>{
+    pub fn render(&mut self, sb: &SampleBank) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
-            self.run_vertex(index, false);
+            self.run_vertex(sb, index, false);
             Some(self.vertices[index].read_buffer())
         } else {
             None
         }
     }
 
-    pub fn scan(&mut self, chunks: usize){
+    pub fn scan(&mut self, sb: &SampleBank, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         for _ in 0..chunks {
             self.reset_ran_stati();
-            self.run_vertex(i, true);
+            self.run_vertex(sb, i, true);
         }
         self.set_time(0);
     }
 }
 
-pub struct Vertex<'a>{
+pub struct Vertex{
     buf: Sample,
     gain: f32,
     angle: f32,
-    ext: VertexExt<'a>,
+    ext: VertexExt,
 }
 
-impl<'a> Vertex<'a>{
-    pub fn new(bl: usize, gain: f32, angle: f32, ext: VertexExt<'a>) -> Self{
+impl Vertex{
+    pub fn new(bl: usize, gain: f32, angle: f32, ext: VertexExt) -> Self{
         Self{
             buf: Sample::new(bl),
             gain,
@@ -179,9 +188,9 @@ impl<'a> Vertex<'a>{
         &self.buf
     }
 
-    fn generate(&mut self, len: usize, is_scan: bool, res: Vec<&Sample>){
+    fn generate(&mut self, sb: &SampleBank, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
-        self.ext.generate(self.gain, self.angle, &mut self.buf, len, res, is_scan);
+        self.ext.generate(sb, self.gain, self.angle, &mut self.buf, len, res, is_scan);
     }
 
     // Whether or not you can connect another vertex to (into) this one
@@ -202,19 +211,19 @@ impl<'a> Vertex<'a>{
     }
 }
 
-pub enum VertexExt<'a>{
+pub enum VertexExt{
     Sum,
     Normalize{
         max: f32,
     },
     SampleLoop{
-        sample: &'a Sample,
+        sample_index: usize,
         playing: bool,
         t: usize,
     },
 }
 
-impl<'a> VertexExt<'a>{
+impl VertexExt{
     pub fn sum() -> Self{
         Self::Sum
     }
@@ -225,9 +234,9 @@ impl<'a> VertexExt<'a>{
         }
     }
 
-    pub fn sample_loop(sample: &'a Sample) -> Self{
+    pub fn sample_loop(sample_index: usize) -> Self{
         Self::SampleLoop{
-            sample,
+            sample_index,
             playing: true,
             t: 0,
         }
@@ -239,7 +248,7 @@ impl<'a> VertexExt<'a>{
         }
     }
 
-    fn generate(&mut self, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    fn generate(&mut self, sb: &SampleBank, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
         match self{
             Self::Sum => {
                 sum_gen(buf, len, res);
@@ -247,8 +256,8 @@ impl<'a> VertexExt<'a>{
             Self::Normalize { max } => {
                 normalize_gen(buf, len, res, max, is_scan);
             },
-            Self::SampleLoop { playing, t, sample } => {
-                sample_loop_gen(buf, len, playing, t, sample);
+            Self::SampleLoop { playing, t, sample_index } => {
+                sample_loop_gen(buf, sb, len, playing, t, *sample_index);
             },
         }
         buf.apply_angle(angle, len);
@@ -288,7 +297,8 @@ fn normalize_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, max: &mut f32,
     }
 }
 
-fn sample_loop_gen(buf: &mut Sample, len: usize, playing: &mut bool, t: &mut usize, sample: &Sample){
+fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize){
+    let sample = sb.get_sample(sample_index);
     if *playing{
         let l = sample.len();
         for i in 0..len{

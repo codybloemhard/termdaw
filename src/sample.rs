@@ -1,4 +1,4 @@
-use std::collections::{ HashMap };
+use std::collections::{ HashMap, HashSet };
 
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 
@@ -102,12 +102,22 @@ impl Sample{
     }
 }
 
+impl Default for Sample{
+    fn default() -> Self{
+        Self{
+            l: Vec::new(),
+            r: Vec::new(),
+        }
+    }
+}
+
 pub struct SampleBank{
     sample_rate: usize,
     samples: Vec<Sample>,
     names: HashMap<String, usize>,
     max_sr: usize,
     max_bd: usize,
+    marked: HashSet<usize>,
 }
 
 impl SampleBank{
@@ -118,6 +128,7 @@ impl SampleBank{
             names: HashMap::new(),
             max_sr: 0,
             max_bd: 0,
+            marked: HashSet::new(),
         }
     }
 
@@ -184,12 +195,38 @@ impl SampleBank{
         Ok(())
     }
 
-    pub fn get(&self, name: &str) -> Option<&Sample>{
+    pub fn mark_dead(&mut self, name: &str){
         if let Some(index) = self.names.get(name){
-            Some(&self.samples[*index])
+            self.marked.insert(*index);
+        }
+    }
+
+    pub fn refresh(&mut self){
+        if self.marked.is_empty() { return; }
+        let mut new_map = HashMap::new();
+        let mut new_vec = Vec::new();
+        let names = std::mem::take(&mut self.names);
+        for (name, index) in names{
+            if self.marked.contains(&index) { continue; }
+            let sample = std::mem::take(&mut self.samples[index]);
+            new_vec.push(sample);
+            new_map.insert(name, new_vec.len() - 1);
+        }
+        self.names = new_map;
+        self.samples = new_vec;
+        self.marked.clear();
+    }
+
+    pub fn get_index(&self, name: &str) -> Option<usize>{
+        if let Some(index) = self.names.get(name){
+            Some(*index)
         } else {
             None
         }
+    }
+
+    pub fn get_sample(&self, index: usize) -> &Sample{
+        &self.samples[index]
     }
 
     pub fn get_max_sr_bd(&self) -> (usize, usize){

@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::prelude::*;
+use std::io::{ self, Read };
 
 use mlua::prelude::*;
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
@@ -39,77 +39,127 @@ fn main() -> Result<(), String>{
     let mut sb = SampleBank::new(psr);
     let mut g = Graph::new(bl);
 
-    let mut samples_to_load = Vec::new();
-    let mut seeds_sum = Vec::new();
-    let mut seeds_norm = Vec::new();
-    let mut seeds_sl = Vec::new();
-    let mut connections = Vec::new();
+    let mut cur_samples = Vec::new();
 
-    lua.scope(|scope| {
-        // ---- Settings
-        lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
-            cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
-            Ok(())
-        })?)?;
-        lua.globals().set("set_render_samplerate", scope.create_function_mut(|_, new_sr: usize| {
-            render_sr = new_sr;
-            Ok(())
-        })?)?;
-        lua.globals().set("set_render_bitdepth", scope.create_function_mut(|_, new_bd: usize| {
-            bd = new_bd;
-            Ok(())
-        })?)?;
-        lua.globals().set("set_output_file", scope.create_function_mut(|_, out: String| {
-            output_file = out;
-            Ok(())
-        })?)?;
-        // ---- Resources
-        // load_sample(name, file)
-        lua.globals().set("load_sample", scope.create_function_mut(|_, seed: (String, String)| {
-            samples_to_load.push(seed);
-            Ok(())
-        })?)?;
-        // ---- Graph
-        // add_sum(name, gain, angle)
-        lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-            seeds_sum.push(seed);
-            Ok(())
-        })?)?;
-        // add_normalize(name, gain, angle)
-        lua.globals().set("add_normalize", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-            seeds_norm.push(seed);
-            Ok(())
-        })?)?;
-        // add_sampleloop(name, gain, angle, sample)
-        lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-            seeds_sl.push(seed);
-            Ok(())
-        })?)?;
-        // connect(name, name)
-        lua.globals().set("connect", scope.create_function_mut(|_, seed: (String, String)| {
-            connections.push(seed);
-            Ok(())
-        })?)?;
-        lua.globals().set("set_output", scope.create_function_mut(|_, out: String| {
-            output_vertex = out;
-            Ok(())
-        })?)?;
-        lua.load(&contents).exec()
-    }).unwrap();
+    loop{
+        let mut buffer = String::new();
+        let stdin = io::stdin();
+        stdin.read_line(&mut buffer).unwrap();
+        println!("---- {}", buffer);
 
-    for (name, file) in samples_to_load { sb.add(name, &file)?; }
-    for (name, gain, angle) in seeds_sum { g.add(Vertex::new(bl, gain, angle, VertexExt::sum()), name); }
-    for (name, gain, angle) in seeds_norm { g.add(Vertex::new(bl, gain, angle, VertexExt::normalize()), name); }
-    for (name, gain, angle, sample) in seeds_sl { g.add(Vertex::new(bl, gain, angle, VertexExt::sample_loop(sb.get(&sample).unwrap())), name); }
-    for (a, b) in connections { g.connect(&a, &b); }
+        let mut file = File::open(&main).unwrap();
+        contents.clear();
+        file.read_to_string(&mut contents).unwrap();
+        std::mem::drop(file);
 
-    g.set_output(&output_vertex);
-    if !g.check_graph(){
-        return Err("TermDaw: graph check failed.".to_owned());
+        let mut new_samples = Vec::new();
+        let mut new_sums = Vec::new();
+        let mut new_norms = Vec::new();
+        let mut new_sampleloops = Vec::new();
+        let mut new_edges = Vec::new();
+
+        lua.scope(|scope| {
+            // ---- Settings
+            lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
+                cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
+                Ok(())
+            })?)?;
+            lua.globals().set("set_render_samplerate", scope.create_function_mut(|_, new_sr: usize| {
+                render_sr = new_sr;
+                Ok(())
+            })?)?;
+            lua.globals().set("set_render_bitdepth", scope.create_function_mut(|_, new_bd: usize| {
+                bd = new_bd;
+                Ok(())
+            })?)?;
+            lua.globals().set("set_output_file", scope.create_function_mut(|_, out: String| {
+                output_file = out;
+                Ok(())
+            })?)?;
+            // ---- Resources
+            // load_sample(name, file)
+            lua.globals().set("load_sample", scope.create_function_mut(|_, seed: (String, String)| {
+                new_samples.push(seed);
+                Ok(())
+            })?)?;
+            // ---- Graph
+            // add_sum(name, gain, angle)
+            lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
+                new_sums.push(seed);
+                Ok(())
+            })?)?;
+            // add_normalize(name, gain, angle)
+            lua.globals().set("add_normalize", scope.create_function_mut(|_, seed: (String, f32, f32)| {
+                new_norms.push(seed);
+                Ok(())
+            })?)?;
+            // add_sampleloop(name, gain, angle, sample)
+            lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
+                new_sampleloops.push(seed);
+                Ok(())
+            })?)?;
+            // connect(name, name)
+            lua.globals().set("connect", scope.create_function_mut(|_, seed: (String, String)| {
+                new_edges.push(seed);
+                Ok(())
+            })?)?;
+            lua.globals().set("set_output", scope.create_function_mut(|_, out: String| {
+                output_vertex = out;
+                Ok(())
+            })?)?;
+            lua.load(&contents).exec()
+        }).unwrap();
+
+        fn diff<T: PartialEq + Clone>(old: &[T], new: &[T]) -> (Vec<T>, Vec<T>){
+            let mut adds = Vec::new();
+            for t in new{
+                if !old.contains(t){
+                    adds.push(t.clone());
+                }
+            }
+            let mut removes = Vec::new();
+            for t in old{
+                if !new.contains(t){
+                    removes.push(t.clone());
+                }
+            }
+            (adds, removes)
+        }
+
+        // samples may be long, try not to reallocate to much shit
+        let (pos, neg) = diff(&cur_samples, &new_samples);
+        for (name, _) in neg {
+            println!("Info: sample \"{}\" will be removed from the sample bank.", name);
+            sb.mark_dead(&name);
+        }
+        println!("Status: refreshing sample bank.");
+        sb.refresh();
+        for (name, file) in pos {
+            println!("Status: adding sample \"{}\" to the sample bank.", name);
+            sb.add(name, &file)?;
+        }
+
+        // just rebuild the damn thing, if it becomes problamatic i'll do something about it,
+        // probably :)
+        println!("Status: rebuilding graph.");
+        g.reset();
+        for (name, gain, angle) in &new_sums { g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
+        for (name, gain, angle) in &new_norms { g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
+        for (name, gain, angle, sample) in &new_sampleloops { g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(sb.get_index(&sample).unwrap())), name.to_owned()); }
+        for (a, b) in &new_edges { g.connect(a, b); }
+
+        g.set_output(&output_vertex);
+        if !g.check_graph(){
+            return Err("TermDaw: graph check failed.".to_owned());
+        }
+        g.scan(&sb, cs);
+
+        cur_samples = new_samples;
+        println!("Status: refreshed.");
+
+        render((psr, render_sr, bd, bl, cs), &output_file, &sb, &mut g);
     }
-    g.scan(cs);
 
-    render((psr, render_sr, bd, bl, cs), &output_file, &sb, &mut g);
     Ok(())
 }
 
@@ -132,6 +182,7 @@ struct Settings{
 }
 
 fn render((psr, render_sr, bd, bl, cs): (usize, usize, usize, usize, usize), output_file: &str, sb: &SampleBank, g: &mut Graph) {
+    println!("Status: started rendering");
     let (msr, mbd) = sb.get_max_sr_bd();
     if psr > render_sr{
         println!("TermDaw: warning: render will down sample from {}(project s.r.) to {}.", psr, render_sr);
@@ -177,7 +228,7 @@ fn render((psr, render_sr, bd, bl, cs): (usize, usize, usize, usize, usize), out
             params, bl, 2
         );
         for _ in 0..cs{
-            let chunk = g.render();
+            let chunk = g.render(sb);
             if chunk.is_none() { continue; }
             let chunk = chunk.unwrap();
             let waves_in = vec![chunk.l.clone(), chunk.r.clone()];
@@ -187,11 +238,12 @@ fn render((psr, render_sr, bd, bl, cs): (usize, usize, usize, usize, usize), out
         }
     } else {
         for _ in 0..cs{
-            let chunk = g.render();
+            let chunk = g.render(sb);
             if chunk.is_none() { continue; }
             let chunk = chunk.unwrap();
             if bd > 16 { write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
             else { write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
         }
     }
+    println!("Status: done rendering.");
 }
