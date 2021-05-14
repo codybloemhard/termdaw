@@ -12,3 +12,4 @@ hound = "3.4.0"
 rubato = "0.8.1"
 toml = "0.5.8"
 serde = { version = "1.0.125", features = ["derive"] }
+skim = "0.9.4"
