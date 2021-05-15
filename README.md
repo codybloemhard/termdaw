@@ -7,9 +7,9 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Render audio
     - Any samplerate: will up or down sample from project rate
     - 8, 16, 24 or 32 bit bitdepth
-  - [ ] Play back audio
+  - [x] Play back audio
 - Terminal UX
-    - [ ] Controls: play, pause, stop
+    - [x] Controls: play, pause, stop
     - [ ] Controls: set time, dash in time
     - [x] Controls: refresh, render
     - [ ] View: Terminal logging, warnings, errors, colors
@@ -28,7 +28,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sample loop vertex
   - [ ] Sample midi vertex (emit sample on note)
   - [ ] Lv2 fx vertex
-  - [ ] Lv2 midi instrument vertex
+  - [ ] Buildin midi synth
 - Lua
   - [x] To configure the project(sample rate, etc)
   - [x] Load resources (samples and plugins)
@@ -40,6 +40,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Automation
 - [ ] Midi pipeline
 - [ ] Mono support
+- [ ] Lv2 midi instrument vertex
 
 ## Example
 ```toml

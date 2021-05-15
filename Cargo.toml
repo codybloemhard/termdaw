@@ -13,3 +13,4 @@ rubato = "0.8.1"
 toml = "0.5.8"
 serde = { version = "1.0.125", features = ["derive"] }
 skim = "0.9.4"
+sdl2 = "0.34.5"

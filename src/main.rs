@@ -1,10 +1,14 @@
 use std::fs::File;
 use std::io::{ Read, Cursor };
+use std::thread;
+use std::sync::mpsc;
+use std::time::{ Duration, Instant };
 
 use mlua::prelude::*;
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use serde::Deserialize;
 use skim::prelude::*;
+use sdl2::audio::AudioSpecDesired;
 
 mod sample;
 mod graph;
@@ -49,28 +53,109 @@ fn main() -> Result<(), String>{
     };
     state.refresh()?;
 
-    loop{
-        let options = SkimOptionsBuilder::default()
-            .height(Some("16%")).build().unwrap();
-        let input = "quit\nrender\nrefresh".to_string();
-        let item_reader = SkimItemReader::default();
-        let items = item_reader.of_bufread(Cursor::new(input));
-        let selected_items = Skim::run_with(&options, Some(items))
-            .map(|out| out.selected_items)
-            .unwrap_or_else(Vec::new);
+    let sdl_context = sdl2::init()?;
+    let audio_subsystem = sdl_context.audio()?;
+    let desired_spec = AudioSpecDesired {
+        freq: Some(state.config.settings.project_samplerate as i32),
+        channels: Some(2),
+        samples: None,
+    };
+    let device = audio_subsystem.open_queue::<f32, _>(None, &desired_spec)?;
+    let mut playing = false;
+    let mut since = Instant::now();
+    let mut millis_generated = 0f32;
 
-        if let Some(item) = selected_items.get(0){
-            let command = item.output();
-            println!("---- {}", command);
-            if command == "quit"{
-                return Ok(());
-            } else if command == "refresh"{
-                state.refresh()?;
-            } else if command == "render"{
-                state.render();
+    let (transmit_to_ui, receive_in_ui) = mpsc::channel();
+    let (transmit_to_main, receive_in_main) = mpsc::channel();
+
+    thread::spawn(move || {
+        loop{
+            let options = SkimOptionsBuilder::default()
+                .height(Some("8%")).build().unwrap();
+            let input = "quit\nrender\nrefresh\nplay\npause\nstop".to_string();
+            let item_reader = SkimItemReader::default();
+            let items = item_reader.of_bufread(Cursor::new(input));
+            let selected_items = Skim::run_with(&options, Some(items))
+                .map(|out| out.selected_items)
+                .unwrap_or_else(Vec::new);
+
+            if let Some(item) = selected_items.get(0){
+                let command = item.output();
+                println!("---- {}", command);
+                let tmsg = if command == "quit"{ ThreadMsg::Quit }
+                else if command == "refresh"{ ThreadMsg::Refresh }
+                else if command == "render"{ ThreadMsg::Render }
+                else if command == "play"{ ThreadMsg::Play }
+                else if command == "pause"{ ThreadMsg::Pause }
+                else if command == "stop" { ThreadMsg::Stop }
+                else { ThreadMsg::None };
+                transmit_to_main.send(tmsg).unwrap();
+            } else {
+                println!("TermDaw: command not found!");
+                continue;
+            }
+            for received in &receive_in_ui{
+                if received == ThreadMsg::Ready{
+                    break;
+                }
             }
         }
+    });
+
+    loop {
+        if let Ok(rec) = receive_in_main.try_recv(){
+            match rec{
+                ThreadMsg::Quit => {
+                    break;
+                },
+                ThreadMsg::Refresh => {
+                    state.refresh()?;
+                    playing = false;
+                },
+                ThreadMsg::Render => {
+                    state.render();
+                    playing = false;
+                },
+                ThreadMsg::Play => {
+                    playing = true;
+                    since = Instant::now();
+                    millis_generated = 0.0;
+                    device.resume();
+                },
+                ThreadMsg::Pause => {
+                    playing = false;
+                    device.pause();
+                },
+                ThreadMsg::Stop => {
+                    playing = false;
+                    device.pause();
+                    device.clear();
+                    state.g.set_time(0);
+                }
+                _ => {}
+            }
+            transmit_to_ui.send(ThreadMsg::Ready).unwrap();
+        }
+        if playing{
+            let time_since = since.elapsed().as_millis() as f32;
+            // render half second in advance to be played
+            while time_since > millis_generated - 0.5 {
+                let chunk = state.g.render(&state.sb);
+                let chunk = chunk.unwrap();
+                let stream_data = chunk.clone().deinterleave();
+                device.queue(&stream_data);
+                millis_generated += state.config.settings.buffer_length as f32 / state.config.settings.project_samplerate as f32 * 1000.0;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(10));
     }
+
+    Ok(())
+}
+
+#[derive(PartialEq)]
+pub enum ThreadMsg{
+    None, Ready, Quit, Refresh, Render, Play, Pause, Stop,
 }
 
 struct State{
@@ -284,6 +369,7 @@ impl State{
                 else { write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
             }
         }
+        self.g.set_time(0);
         println!("Status: done rendering.");
     }
 }

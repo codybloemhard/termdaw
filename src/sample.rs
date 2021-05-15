@@ -2,6 +2,7 @@ use std::collections::{ HashMap, HashSet };
 
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 
+#[derive(Clone)]
 pub struct Sample{
     pub l: Vec<f32>,
     pub r: Vec<f32>,
@@ -99,6 +100,15 @@ impl Sample{
         Self{
             l, r
         }
+    }
+
+    pub fn deinterleave(self) -> Vec<f32>{
+        let mut res = Vec::new();
+        for i in 0..self.len(){
+            res.push(self.l[i]);
+            res.push(self.r[i]);
+        }
+        res
     }
 }
 
