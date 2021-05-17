@@ -27,7 +27,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Normalize vertex
   - [x] Sample loop vertex
   - [ ] Sample midi vertex (emit sample on note)
-  - [ ] Lv2 fx vertex
+  - [x] Lv2 fx vertex
   - [ ] Buildin midi synth
 - Lua
   - [x] To configure the project(sample rate, etc)

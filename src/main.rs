@@ -9,6 +9,7 @@ use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters
 use serde::Deserialize;
 use skim::prelude::*;
 use sdl2::audio::AudioSpecDesired;
+use lv2hm::Lv2Host;
 
 mod sample;
 mod graph;
@@ -34,14 +35,11 @@ fn main() -> Result<(), String>{
     file.read_to_string(&mut contents).unwrap();
     std::mem::drop(file);
 
-    let lua = Lua::new();
-    let sb = SampleBank::new(config.settings.project_samplerate);
-    let g = Graph::new(config.settings.buffer_length);
-
     let mut state = State{
-        lua,
-        sb,
-        g,
+        lua: Lua::new(),
+        sb: SampleBank::new(config.settings.project_samplerate),
+        g: Graph::new(config.settings.buffer_length),
+        host: Lv2Host::new(1000, config.settings.buffer_length * 2), // acount for l/r
         contents,
         config,
         cs: 0,
@@ -50,6 +48,8 @@ fn main() -> Result<(), String>{
         output_vertex: String::new(),
         output_file: String::from("outp.wav"),
         cur_samples: Vec::new(),
+        cur_lv2plugins: Vec::new(),
+        cur_lv2params: Vec::new(),
     };
     state.refresh()?;
 
@@ -69,12 +69,12 @@ fn main() -> Result<(), String>{
     let (transmit_to_main, receive_in_main) = mpsc::channel();
 
     thread::spawn(move || {
+        let options = SkimOptionsBuilder::default()
+            .height(Some("8%")).build().unwrap();
+        let input = "quit\nrender\nrefresh\nplay\npause\nstop".to_string();
+        let item_reader = SkimItemReader::default();
         loop{
-            let options = SkimOptionsBuilder::default()
-                .height(Some("8%")).build().unwrap();
-            let input = "quit\nrender\nrefresh\nplay\npause\nstop".to_string();
-            let item_reader = SkimItemReader::default();
-            let items = item_reader.of_bufread(Cursor::new(input));
+            let items = item_reader.of_bufread(Cursor::new(input.clone()));
             let selected_items = Skim::run_with(&options, Some(items))
                 .map(|out| out.selected_items)
                 .unwrap_or_else(Vec::new);
@@ -140,7 +140,7 @@ fn main() -> Result<(), String>{
             let time_since = since.elapsed().as_millis() as f32;
             // render half second in advance to be played
             while time_since > millis_generated - 0.5 {
-                let chunk = state.g.render(&state.sb);
+                let chunk = state.g.render(&state.sb, &mut state.host);
                 let chunk = chunk.unwrap();
                 let stream_data = chunk.clone().deinterleave();
                 device.queue(&stream_data);
@@ -162,6 +162,7 @@ struct State{
     lua: Lua,
     sb: SampleBank,
     g: Graph,
+    host: Lv2Host,
     config: Config,
     contents: String,
     cs: usize,
@@ -169,7 +170,9 @@ struct State{
     bd: usize,
     output_vertex: String,
     output_file: String,
-    cur_samples: Vec<(String, String)>
+    cur_samples: Vec<(String, String)>,
+    cur_lv2plugins: Vec<(String, String)>,
+    cur_lv2params: Vec<(String, String, f32)>,
 }
 
 impl State{
@@ -186,6 +189,9 @@ impl State{
         let mut new_norms = Vec::new();
         let mut new_sampleloops = Vec::new();
         let mut new_edges = Vec::new();
+        let mut new_lv2plugins = Vec::new();
+        let mut new_lv2params = Vec::new();
+        let mut new_lv2fxs = Vec::new();
 
         let mut cs = self.cs;
         let mut render_sr = self.render_sr;
@@ -217,6 +223,16 @@ impl State{
                 new_samples.push(seed);
                 Ok(())
             })?)?;
+            // load_lv2(name, uri)
+            self.lua.globals().set("load_lv2", scope.create_function_mut(|_, seed: (String, String)| {
+                new_lv2plugins.push(seed);
+                Ok(())
+            })?)?;
+            // parameter(plugin, name, value)
+            self.lua.globals().set("parameter", scope.create_function_mut(|_, seed: (String, String, f32)| {
+                new_lv2params.push(seed);
+                Ok(())
+            })?)?;
             // ---- Graph
             // add_sum(name, gain, angle)
             self.lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
@@ -231,6 +247,11 @@ impl State{
             // add_sampleloop(name, gain, angle, sample)
             self.lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
                 new_sampleloops.push(seed);
+                Ok(())
+            })?)?;
+            // add_lv2fx(name, gain, angle, plugin)
+            self.lua.globals().set("add_lv2fx", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
+                new_lv2fxs.push(seed);
                 Ok(())
             })?)?;
             // connect(name, name)
@@ -279,6 +300,25 @@ impl State{
             println!("Status: adding sample \"{}\" to the sample bank.", name);
             self.sb.add(name, &file)?;
         }
+        // same for plugins
+        // TODO: make renaming possible
+        let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
+        for (name, _) in neg { // TODO: make plugins removable
+            self.host.remove_plugin(&name);
+        }
+        for (name, uri) in pos {
+            self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()).unwrap_or_else(|_| panic!("Error: Lv2hm could not add plugin with uri {}.", uri));
+            println!("Info: added plugin {} with uri {}.", name, uri);
+        }
+
+        // need diff to see what params we need to reset
+        let (pos, neg) = diff(&self.cur_lv2params, &new_lv2params);
+        for (plugin, name, _) in neg { // TODO: make params resetable in Lv2hm
+            self.host.reset_value(&plugin, &name);
+        }
+        for (plugin, name, value) in pos{
+            self.host.set_value(&plugin, &name, value);
+        }
 
         // just rebuild the damn thing, if it becomes problamatic i'll do something about it,
         // probably :)
@@ -287,15 +327,19 @@ impl State{
         for (name, gain, angle) in &new_sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &new_norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &new_sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
+        for (name, gain, angle, plugin) in &new_lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (a, b) in &new_edges { self.g.connect(a, b); }
 
         self.g.set_output(&self.output_vertex);
         if !self.g.check_graph(){
             return Err("TermDaw: graph check failed.".to_owned());
         }
-        self.g.scan(&self.sb, self.cs);
+        self.g.scan(&self.sb, &mut self.host, self.cs);
 
         self.cur_samples = new_samples;
+        self.cur_lv2plugins = new_lv2plugins;
+        self.cur_lv2params = new_lv2params;
+
         println!("Status: refreshed.");
         Ok(())
     }
@@ -352,7 +396,7 @@ impl State{
                 params, bl, 2
             );
             for _ in 0..self.cs{
-                let chunk = self.g.render(&self.sb);
+                let chunk = self.g.render(&self.sb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 let waves_in = vec![chunk.l.clone(), chunk.r.clone()];
@@ -362,7 +406,7 @@ impl State{
             }
         } else {
             for _ in 0..self.cs{
-                let chunk = self.g.render(&self.sb);
+                let chunk = self.g.render(&self.sb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 if self.bd > 16 { write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }

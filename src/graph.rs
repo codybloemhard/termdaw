@@ -1,4 +1,5 @@
 use crate::sample::{ Sample, SampleBank };
+use lv2hm::Lv2Host;
 
 use std::collections::{ HashMap };
 
@@ -81,13 +82,13 @@ impl Graph{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, sb: &SampleBank, index: usize, is_scan: bool){
+    fn run_vertex(&mut self, sb: &SampleBank, host: &mut Lv2Host, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
         let edges = self.edges[index].clone();
         for incoming in &edges{
-            self.run_vertex(sb, *incoming, is_scan);
+            self.run_vertex(sb, host, *incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
         // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
@@ -96,7 +97,7 @@ impl Graph{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(sb, self.max_buffer_len, is_scan, ins);
+            self.vertices[index].generate(sb, host, self.max_buffer_len, is_scan, ins);
         }
     }
 
@@ -146,22 +147,22 @@ impl Graph{
         }
     }
 
-    pub fn render(&mut self, sb: &SampleBank) -> Option<&Sample>{
+    pub fn render(&mut self, sb: &SampleBank, host: &mut Lv2Host) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
-            self.run_vertex(sb, index, false);
+            self.run_vertex(sb, host, index, false);
             Some(self.vertices[index].read_buffer())
         } else {
             None
         }
     }
 
-    pub fn scan(&mut self, sb: &SampleBank, chunks: usize){
+    pub fn scan(&mut self, sb: &SampleBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         for _ in 0..chunks {
             self.reset_ran_stati();
-            self.run_vertex(sb, i, true);
+            self.run_vertex(sb, host, i, true);
         }
         self.set_time(0);
     }
@@ -188,9 +189,9 @@ impl Vertex{
         &self.buf
     }
 
-    fn generate(&mut self, sb: &SampleBank, len: usize, is_scan: bool, res: Vec<&Sample>){
+    fn generate(&mut self, sb: &SampleBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
-        self.ext.generate(sb, self.gain, self.angle, &mut self.buf, len, res, is_scan);
+        self.ext.generate(sb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
     }
 
     // Whether or not you can connect another vertex to (into) this one
@@ -221,6 +222,9 @@ pub enum VertexExt{
         playing: bool,
         t: usize,
     },
+    Lv2fx{
+        index: usize,
+    }
 }
 
 impl VertexExt{
@@ -242,13 +246,19 @@ impl VertexExt{
         }
     }
 
+    pub fn lv2fx(plugin_index: usize) -> Self{
+        Self::Lv2fx{
+            index: plugin_index,
+        }
+    }
+
     fn set_time(&mut self, time: usize){
         if let Self::SampleLoop { t, .. } = self{
             *t = time;
         }
     }
 
-    fn generate(&mut self, sb: &SampleBank, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    fn generate(&mut self, sb: &SampleBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
         match self{
             Self::Sum => {
                 sum_gen(buf, len, res);
@@ -258,6 +268,9 @@ impl VertexExt{
             },
             Self::SampleLoop { playing, t, sample_index } => {
                 sample_loop_gen(buf, sb, len, playing, t, *sample_index);
+            },
+            Self::Lv2fx { index } => {
+                lv2fx_gen(buf, len, res, *index, host);
             },
         }
         buf.apply_angle(angle, len);
@@ -269,7 +282,8 @@ impl VertexExt{
             Self::Sum => true,
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
-        }
+            Self::Lv2fx { .. } => true,
+         }
     }
 }
 
@@ -308,6 +322,16 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut 
         *t += len;
     } else {
         buf.zero();
+    }
+}
+
+fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){
+    sum_inputs(buf, len, res);
+    if let Some(outp_ref) = host.apply_plugin_n_frames(index, &buf.clone().deinterleave()){
+        for i in 0..len{
+            buf.l[i] = outp_ref[i * 2];
+            buf.r[i] = outp_ref[i * 2 + 1];
+        }
     }
 }
 
