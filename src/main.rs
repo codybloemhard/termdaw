@@ -13,8 +13,10 @@ use lv2hm::Lv2Host;
 
 mod sample;
 mod graph;
+mod floww;
 use sample::*;
 use graph::*;
+use floww::*;
 
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
