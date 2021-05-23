@@ -6,14 +6,17 @@ use apres::MIDIEvent::{ NoteOn, NoteOff };
 #[derive(Default)]
 pub struct FlowwBank{
     sr: usize,
+    bl: usize,
+    frame: usize,
+    block_index: usize,
     drum_flowws: Vec<DrumFloww>,
     drum_start_indices: Vec<usize>,
     drum_names: HashMap<String, usize>,
 }
 
 impl FlowwBank{
-    pub fn new(sr: usize) -> Self{
-        Self{ sr: sr, ..Default::default() }
+    pub fn new(sr: usize, bl: usize) -> Self{
+        Self{ sr, bl, ..Default::default() }
     }
 
     pub fn add_drum_floww(&mut self, name: String, path: &str){
@@ -35,10 +38,11 @@ impl FlowwBank{
         }
     }
 
-    pub fn set_time(&mut self, t: f32){
-        let t_frame = (t * self.sr as f32).round() as usize;
+    fn set_start_indices_to_frame(&mut self, t_frame: usize, do_skip: bool){
         for (i, floww) in self.drum_flowws.iter().enumerate(){
-            for (j, (frame, _, _)) in floww.iter().enumerate(){
+            let skip = if do_skip{ self.drum_start_indices[i] }
+            else { 0 };
+            for (j, (frame, _, _)) in floww.iter().enumerate().skip(skip){
                 if frame > &t_frame{
                     self.drum_start_indices[i] = j;
                     break;
@@ -46,20 +50,51 @@ impl FlowwBank{
             }
         }
     }
+
+    pub fn set_time(&mut self, t: f32){
+        let t_frame = (t * self.sr as f32).round() as usize;
+        self.set_start_indices_to_frame(t_frame, false);
+        self.frame = t_frame;
+    }
+
+    pub fn set_time_to_next_block(&mut self){
+        let frame = self.frame + self.bl;
+        self.set_start_indices_to_frame(frame, true);
+    }
+
+    pub fn start_block(&mut self, index: usize){
+        if index >= self.drum_flowws.len() { return; }
+        self.block_index = self.drum_start_indices[index];
+    }
+
+    pub fn get_block(&mut self, index: usize, offset_frame: usize) -> Option<DrumPoint>{
+        if index >= self.drum_flowws.len() { return None; }
+        let next_event = self.drum_flowws[index][self.block_index];
+        if next_event.0 == self.frame + offset_frame{
+            if self.block_index + 1 < self.drum_flowws[index].len() {
+                self.block_index += 1;
+            }
+            Some(next_event)
+        } else {
+            None
+        }
+    }
 }
 
 // (frame, note, vel)
-pub type DrumFloww = Vec<(usize,f32,f32)>;
+pub type DrumPoint = (usize, f32, f32);
+pub type DrumFloww = Vec<DrumPoint>;
 
 pub fn mono_midi_to_drum_floww(midi: MIDI, sr: usize) -> DrumFloww{
     let mut floww = Vec::new();
     for track in midi.get_tracks(){
         for (tick, id) in track{
-            if let Some(NoteOn(_ch, note, vel)) = midi.get_event(id) {
+            if let Some(NoteOn(note, _what_is_this, vel)) = midi.get_event(id) {
                 floww.push(((tick as f32 * sr as f32) as usize, note as f32, vel as f32));
             }
         }
     }
+    floww.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     floww
 }
 

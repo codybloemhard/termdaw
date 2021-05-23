@@ -18,6 +18,9 @@ use sample::*;
 use graph::*;
 use floww::*;
 
+use apres::MIDI;
+use apres::MIDIEvent::{NoteOff, NoteOn};
+
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
 
@@ -42,6 +45,7 @@ fn main() -> Result<(), String>{
         sb: SampleBank::new(config.settings.project_samplerate),
         g: Graph::new(config.settings.buffer_length),
         host: Lv2Host::new(1000, config.settings.buffer_length * 2), // acount for l/r
+        fb: FlowwBank::new(config.settings.project_samplerate, config.settings.buffer_length),
         contents,
         config,
         cs: 0,
@@ -142,7 +146,7 @@ fn main() -> Result<(), String>{
             let time_since = since.elapsed().as_millis() as f32;
             // render half second in advance to be played
             while time_since > millis_generated - 0.5 {
-                let chunk = state.g.render(&state.sb, &mut state.host);
+                let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                 let chunk = chunk.unwrap();
                 let stream_data = chunk.clone().deinterleave();
                 device.queue(&stream_data);
@@ -165,6 +169,7 @@ struct State{
     sb: SampleBank,
     g: Graph,
     host: Lv2Host,
+    fb: FlowwBank,
     config: Config,
     contents: String,
     cs: usize,
@@ -336,7 +341,7 @@ impl State{
         if !self.g.check_graph(){
             return Err("TermDaw: graph check failed.".to_owned());
         }
-        self.g.scan(&self.sb, &mut self.host, self.cs);
+        self.g.scan(&self.sb, &mut self.fb, &mut self.host, self.cs);
 
         self.cur_samples = new_samples;
         self.cur_lv2plugins = new_lv2plugins;
@@ -398,7 +403,7 @@ impl State{
                 params, bl, 2
             );
             for _ in 0..self.cs{
-                let chunk = self.g.render(&self.sb, &mut self.host);
+                let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 let waves_in = vec![chunk.l.clone(), chunk.r.clone()];
@@ -408,7 +413,7 @@ impl State{
             }
         } else {
             for _ in 0..self.cs{
-                let chunk = self.g.render(&self.sb, &mut self.host);
+                let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 if self.bd > 16 { write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }

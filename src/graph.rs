@@ -1,4 +1,5 @@
 use crate::sample::{ Sample, SampleBank };
+use crate::floww::{ FlowwBank };
 use lv2hm::Lv2Host;
 
 use std::collections::{ HashMap };
@@ -82,13 +83,13 @@ impl Graph{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, sb: &SampleBank, host: &mut Lv2Host, index: usize, is_scan: bool){
+    fn run_vertex(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
         let edges = self.edges[index].clone();
         for incoming in &edges{
-            self.run_vertex(sb, host, *incoming, is_scan);
+            self.run_vertex(sb, fb, host, *incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
         // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
@@ -97,7 +98,7 @@ impl Graph{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(sb, host, self.max_buffer_len, is_scan, ins);
+            self.vertices[index].generate(sb, fb, host, self.max_buffer_len, is_scan, ins);
         }
     }
 
@@ -147,22 +148,22 @@ impl Graph{
         }
     }
 
-    pub fn render(&mut self, sb: &SampleBank, host: &mut Lv2Host) -> Option<&Sample>{
+    pub fn render(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
-            self.run_vertex(sb, host, index, false);
+            self.run_vertex(sb, fb, host, index, false);
             Some(self.vertices[index].read_buffer())
         } else {
             None
         }
     }
 
-    pub fn scan(&mut self, sb: &SampleBank, host: &mut Lv2Host, chunks: usize){
+    pub fn scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         for _ in 0..chunks {
             self.reset_ran_stati();
-            self.run_vertex(sb, host, i, true);
+            self.run_vertex(sb, fb, host, i, true);
         }
         self.set_time(0);
     }
@@ -189,9 +190,9 @@ impl Vertex{
         &self.buf
     }
 
-    fn generate(&mut self, sb: &SampleBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
+    fn generate(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
-        self.ext.generate(sb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
+        self.ext.generate(sb, fb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
     }
 
     // Whether or not you can connect another vertex to (into) this one
@@ -222,6 +223,12 @@ pub enum VertexExt{
         playing: bool,
         t: usize,
     },
+    SampleFloww{
+        sample_index: usize,
+        floww_index: usize,
+        playing: bool,
+        t: usize,
+    },
     Lv2fx{
         index: usize,
     }
@@ -246,6 +253,15 @@ impl VertexExt{
         }
     }
 
+    pub fn sample_floww(sample_index: usize, floww_index: usize) -> Self{
+        Self::SampleFloww{
+            sample_index,
+            floww_index,
+            playing: true,
+            t: 0,
+        }
+    }
+
     pub fn lv2fx(plugin_index: usize) -> Self{
         Self::Lv2fx{
             index: plugin_index,
@@ -253,12 +269,14 @@ impl VertexExt{
     }
 
     fn set_time(&mut self, time: usize){
-        if let Self::SampleLoop { t, .. } = self{
-            *t = time;
+        match self{
+            Self::SampleLoop{ t, .. } => { *t = time; },
+            Self::SampleFloww{ t, .. } => { *t = time; },
+            _ => {  },
         }
     }
 
-    fn generate(&mut self, sb: &SampleBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    fn generate(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
         match self{
             Self::Sum => {
                 sum_gen(buf, len, res);
@@ -268,6 +286,9 @@ impl VertexExt{
             },
             Self::SampleLoop { playing, t, sample_index } => {
                 sample_loop_gen(buf, sb, len, playing, t, *sample_index);
+            },
+            Self::SampleFloww { playing, t, sample_index, floww_index } => {
+                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -282,6 +303,7 @@ impl VertexExt{
             Self::Sum => true,
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
+            Self::SampleFloww { .. } => false,
             Self::Lv2fx { .. } => true,
          }
     }
@@ -312,6 +334,20 @@ fn normalize_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, max: &mut f32,
 }
 
 fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize){
+    let sample = sb.get_sample(sample_index);
+    if *playing{
+        let l = sample.len();
+        for i in 0..len{
+            buf.l[i] = sample.l[(*t + i) % l];
+            buf.r[i] = sample.r[(*t + i) % l];
+        }
+        *t += len;
+    } else {
+        buf.zero();
+    }
+}
+
+fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize){
     let sample = sb.get_sample(sample_index);
     if *playing{
         let l = sample.len();
