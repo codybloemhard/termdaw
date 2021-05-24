@@ -271,7 +271,6 @@ impl VertexExt{
     fn set_time(&mut self, time: usize){
         match self{
             Self::SampleLoop{ t, .. } => { *t = time; },
-            Self::SampleFloww{ t, .. } => { *t = time; },
             _ => {  },
         }
     }
@@ -348,14 +347,18 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut 
 }
 
 fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize){
-    let sample = sb.get_sample(sample_index);
     if *playing{
+        let sample = sb.get_sample(sample_index);
+        fb.start_block(floww_index);
         let l = sample.len();
         for i in 0..len{
+            if let Some((_, note, _vel)) = fb.get_block(floww_index, i){
+                *t = 0;
+            }
             buf.l[i] = sample.l[(*t + i) % l];
             buf.r[i] = sample.r[(*t + i) % l];
+            *t += 1;
         }
-        *t += len;
     } else {
         buf.zero();
     }

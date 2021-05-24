@@ -137,6 +137,7 @@ fn main() -> Result<(), String>{
                     device.pause();
                     device.clear();
                     state.g.set_time(0);
+                    state.fb.set_time(0.0);
                 }
                 _ => {}
             }
@@ -146,6 +147,7 @@ fn main() -> Result<(), String>{
             let time_since = since.elapsed().as_millis() as f32;
             // render half second in advance to be played
             while time_since > millis_generated - 0.5 {
+                state.fb.set_time_to_next_block();
                 let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                 let chunk = chunk.unwrap();
                 let stream_data = chunk.clone().deinterleave();
@@ -195,10 +197,12 @@ impl State{
         let mut new_sums = Vec::new();
         let mut new_norms = Vec::new();
         let mut new_sampleloops = Vec::new();
+        let mut sampleflowws = Vec::new();
         let mut new_edges = Vec::new();
         let mut new_lv2plugins = Vec::new();
         let mut new_lv2params = Vec::new();
         let mut new_lv2fxs = Vec::new();
+        let mut midis = Vec::new();
 
         let mut cs = self.cs;
         let mut render_sr = self.render_sr;
@@ -230,6 +234,11 @@ impl State{
                 new_samples.push(seed);
                 Ok(())
             })?)?;
+            // load_midi(name, file)
+            self.lua.globals().set("load_midi", scope.create_function_mut(|_, seed: (String, String)| {
+                midis.push(seed);
+                Ok(())
+            })?)?;
             // load_lv2(name, uri)
             self.lua.globals().set("load_lv2", scope.create_function_mut(|_, seed: (String, String)| {
                 new_lv2plugins.push(seed);
@@ -254,6 +263,11 @@ impl State{
             // add_sampleloop(name, gain, angle, sample)
             self.lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
                 new_sampleloops.push(seed);
+                Ok(())
+            })?)?;
+            // add_samplefloww(name, gain, angle, sample, floww)
+            self.lua.globals().set("add_samplefloww", scope.create_function_mut(|_, seed: (String, f32, f32, String, String)| {
+                sampleflowws.push(seed);
                 Ok(())
             })?)?;
             // add_lv2fx(name, gain, angle, plugin)
@@ -307,6 +321,11 @@ impl State{
             println!("Status: adding sample \"{}\" to the sample bank.", name);
             self.sb.add(name, &file)?;
         }
+        // Just reload all midi, so you can easily import newly inplace generated files
+        self.fb.reset();
+        for (name, file) in midis{
+            self.fb.add_drum_floww(name, &file);
+        }
         // same for plugins
         // TODO: make renaming possible
         let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
@@ -334,6 +353,11 @@ impl State{
         for (name, gain, angle) in &new_sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &new_norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &new_sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
+        for (name, gain, angle, sample, floww) in &sampleflowws {
+            let sample = self.sb.get_index(&sample).unwrap();
+            let floww = self.fb.get_index(&floww).unwrap();
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww(sample, floww)), name.to_owned());
+        }
         for (name, gain, angle, plugin) in &new_lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (a, b) in &new_edges { self.g.connect(a, b); }
 
@@ -403,6 +427,7 @@ impl State{
                 params, bl, 2
             );
             for _ in 0..self.cs{
+                self.fb.set_time_to_next_block();
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
@@ -413,6 +438,7 @@ impl State{
             }
         } else {
             for _ in 0..self.cs{
+                self.fb.set_time_to_next_block();
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();

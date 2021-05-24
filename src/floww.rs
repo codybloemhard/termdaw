@@ -19,6 +19,14 @@ impl FlowwBank{
         Self{ sr, bl, ..Default::default() }
     }
 
+    pub fn reset(&mut self){
+        self.frame = 0;
+        self.block_index = 0;
+        self.drum_flowws.clear();
+        self.drum_start_indices.clear();
+        self.drum_names.clear();
+    }
+
     pub fn add_drum_floww(&mut self, name: String, path: &str){
         if let Ok(midi) = MIDI::from_path(path){
             let floww = mono_midi_to_drum_floww(midi, self.sr);
@@ -91,6 +99,9 @@ pub fn mono_midi_to_drum_floww(midi: MIDI, sr: usize) -> DrumFloww{
         for (tick, id) in track{
             if let Some(NoteOn(note, _what_is_this, vel)) = midi.get_event(id) {
                 floww.push(((tick as f32 * sr as f32) as usize, note as f32, vel as f32));
+            }
+            if let Some(NoteOff(_, _, _)) = midi.get_event(id){
+                print!("{}, ", tick);
             }
         }
     }

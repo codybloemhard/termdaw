@@ -7,15 +7,16 @@ set_output_file("outp.wav");
 load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav");
 load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav");
 
-load_lv2("crusher", "http://calf.sourceforge.net/plugins/Crusher");
+load_midi("bassd", "/home/cody/git/music-gen/snare.midi");
+ -- load_lv2("compressor", "http://calf.sourceforge.net/plugins/Compressor");
 
 add_sampleloop("one", 1.0, 0.0, "snare");
-add_sampleloop("two", 1.0, 0.0, "kick");
+add_samplefloww("two", 1.0, 0.0, "kick", "bassd");
 add_normalize("sum", 1.0, 0.0);
-add_lv2fx("crush", 1.0, 0.0, "crusher");
+-- add_lv2fx("effect", 1.0, 0.0, "compressor");
 
-connect("one", "crush");
-connect("crush", "sum");
+connect("one", "sum");
+-- connect("crush", "sum");
 connect("two", "sum");
 
 set_output("sum");
