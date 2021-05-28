@@ -1,6 +1,6 @@
 use std::collections::{ HashMap };
 
-use apres::{ MIDI, ApresError };
+use apres::{ MIDI };
 use apres::MIDIEvent::{ NoteOn, NoteOff };
 
 #[derive(Default)]
@@ -51,7 +51,7 @@ impl FlowwBank{
             let skip = if do_skip{ self.drum_start_indices[i] }
             else { 0 };
             for (j, (frame, _, _)) in floww.iter().enumerate().skip(skip){
-                if frame > &t_frame{
+                if frame >= &t_frame{
                     self.drum_start_indices[i] = j;
                     break;
                 }
@@ -66,8 +66,8 @@ impl FlowwBank{
     }
 
     pub fn set_time_to_next_block(&mut self){
-        let frame = self.frame + self.bl;
-        self.set_start_indices_to_frame(frame, true);
+        self.frame += self.bl;
+        self.set_start_indices_to_frame(self.frame, true);
     }
 
     pub fn start_block(&mut self, index: usize){
@@ -94,14 +94,17 @@ pub type DrumPoint = (usize, f32, f32);
 pub type DrumFloww = Vec<DrumPoint>;
 
 pub fn mono_midi_to_drum_floww(midi: MIDI, sr: usize) -> DrumFloww{
+    let ppqn = midi.get_ppqn() as f32;
     let mut floww = Vec::new();
     for track in midi.get_tracks(){
+        let mut time = 0;
         for (tick, id) in track{
-            if let Some(NoteOn(note, _what_is_this, vel)) = midi.get_event(id) {
-                floww.push(((tick as f32 * sr as f32) as usize, note as f32, vel as f32));
+            if let Some(NoteOn(note, _, vel)) = midi.get_event(id) {
+                time += tick;
+                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, vel as f32));
             }
             if let Some(NoteOff(_, _, _)) = midi.get_event(id){
-                print!("{}, ", tick);
+                time += tick;
             }
         }
     }

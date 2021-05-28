@@ -18,9 +18,6 @@ use sample::*;
 use graph::*;
 use floww::*;
 
-use apres::MIDI;
-use apres::MIDIEvent::{NoteOff, NoteOn};
-
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
 
@@ -147,12 +144,12 @@ fn main() -> Result<(), String>{
             let time_since = since.elapsed().as_millis() as f32;
             // render half second in advance to be played
             while time_since > millis_generated - 0.5 {
-                state.fb.set_time_to_next_block();
                 let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                 let chunk = chunk.unwrap();
                 let stream_data = chunk.clone().deinterleave();
                 device.queue(&stream_data);
                 millis_generated += state.config.settings.buffer_length as f32 / state.config.settings.project_samplerate as f32 * 1000.0;
+                state.fb.set_time_to_next_block();
             }
         }
         std::thread::sleep(Duration::from_millis(10));
@@ -266,7 +263,7 @@ impl State{
                 Ok(())
             })?)?;
             // add_samplefloww(name, gain, angle, sample, floww)
-            self.lua.globals().set("add_samplefloww", scope.create_function_mut(|_, seed: (String, f32, f32, String, String)| {
+            self.lua.globals().set("add_samplefloww", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32)| {
                 sampleflowws.push(seed);
                 Ok(())
             })?)?;
@@ -353,10 +350,12 @@ impl State{
         for (name, gain, angle) in &new_sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &new_norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &new_sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
-        for (name, gain, angle, sample, floww) in &sampleflowws {
+        for (name, gain, angle, sample, floww, note) in &sampleflowws {
             let sample = self.sb.get_index(&sample).unwrap();
             let floww = self.fb.get_index(&floww).unwrap();
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww(sample, floww)), name.to_owned());
+            let note = if note < &0 { None }
+            else { Some(*note as usize) };
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww(sample, floww, note)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &new_lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (a, b) in &new_edges { self.g.connect(a, b); }
@@ -427,7 +426,6 @@ impl State{
                 params, bl, 2
             );
             for _ in 0..self.cs{
-                self.fb.set_time_to_next_block();
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
@@ -435,15 +433,16 @@ impl State{
                 let waves_out = resampler.process(&waves_in).unwrap();
                 if self.bd > 16 { write_32s(&mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude); }
                 else { write_16s(&mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude); }
+                self.fb.set_time_to_next_block();
             }
         } else {
             for _ in 0..self.cs{
-                self.fb.set_time_to_next_block();
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 if self.bd > 16 { write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
                 else { write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
+                self.fb.set_time_to_next_block();
             }
         }
         self.g.set_time(0);

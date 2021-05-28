@@ -161,11 +161,14 @@ impl Graph{
     pub fn scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
+        fb.set_time(0.0);
         for _ in 0..chunks {
             self.reset_ran_stati();
             self.run_vertex(sb, fb, host, i, true);
+            fb.set_time_to_next_block();
         }
         self.set_time(0);
+        fb.set_time(0.0);
     }
 }
 
@@ -226,6 +229,7 @@ pub enum VertexExt{
     SampleFloww{
         sample_index: usize,
         floww_index: usize,
+        note: Option<usize>,
         playing: bool,
         t: usize,
     },
@@ -253,12 +257,13 @@ impl VertexExt{
         }
     }
 
-    pub fn sample_floww(sample_index: usize, floww_index: usize) -> Self{
+    pub fn sample_floww(sample_index: usize, floww_index: usize, note: Option<usize>) -> Self{
         Self::SampleFloww{
             sample_index,
             floww_index,
             playing: true,
             t: 0,
+            note,
         }
     }
 
@@ -269,10 +274,7 @@ impl VertexExt{
     }
 
     fn set_time(&mut self, time: usize){
-        match self{
-            Self::SampleLoop{ t, .. } => { *t = time; },
-            _ => {  },
-        }
+        if let Self::SampleLoop{ t, .. } = self { *t = time; }
     }
 
     fn generate(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
@@ -286,8 +288,8 @@ impl VertexExt{
             Self::SampleLoop { playing, t, sample_index } => {
                 sample_loop_gen(buf, sb, len, playing, t, *sample_index);
             },
-            Self::SampleFloww { playing, t, sample_index, floww_index } => {
-                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index);
+            Self::SampleFloww { playing, t, sample_index, floww_index, note } => {
+                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index, *note);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -346,19 +348,29 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut 
     }
 }
 
-fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize){
+fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize, target_note: Option<usize>){
     if *playing{
         let sample = sb.get_sample(sample_index);
         fb.start_block(floww_index);
-        let l = sample.len();
         for i in 0..len{
             if let Some((_, note, _vel)) = fb.get_block(floww_index, i){
-                *t = 0;
+                if let Some(n) = target_note{
+                    if (note - n as f32).abs() < 0.01 {
+                        *t = 0;
+                    }
+                } else {
+                    *t = 0;
+                }
             }
-            buf.l[i] = sample.l[(*t + i) % l];
-            buf.r[i] = sample.r[(*t + i) % l];
-            *t += 1;
+            if *t + i >= sample.len() {
+                buf.l[i] = 0.0;
+                buf.r[i] = 0.0;
+            } else {
+                buf.l[i] = sample.l[*t + i];
+                buf.r[i] = sample.r[*t + i];
+            }
         }
+        *t += len;
     } else {
         buf.zero();
     }
