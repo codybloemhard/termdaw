@@ -232,6 +232,7 @@ pub enum VertexExt{
         note: Option<usize>,
         playing: bool,
         t: usize,
+        vel: f32,
     },
     Lv2fx{
         index: usize,
@@ -264,6 +265,7 @@ impl VertexExt{
             playing: true,
             t: 0,
             note,
+            vel: 1.0,
         }
     }
 
@@ -288,8 +290,8 @@ impl VertexExt{
             Self::SampleLoop { playing, t, sample_index } => {
                 sample_loop_gen(buf, sb, len, playing, t, *sample_index);
             },
-            Self::SampleFloww { playing, t, sample_index, floww_index, note } => {
-                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index, *note);
+            Self::SampleFloww { playing, t, sample_index, floww_index, note, vel } => {
+                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index, *note, vel);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -348,26 +350,27 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut 
     }
 }
 
-fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize, target_note: Option<usize>){
+fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize, target_note: Option<usize>, vel: &mut f32){
     if *playing{
         let sample = sb.get_sample(sample_index);
         fb.start_block(floww_index);
         for i in 0..len{
-            if let Some((_, note, _vel)) = fb.get_block(floww_index, i){
-                if let Some(n) = target_note{
-                    if (note - n as f32).abs() < 0.01 {
-                        *t = 0;
-                    }
-                } else {
+            if let Some((note, v)) = fb.get_block(floww_index, i){
+                let ok = if let Some(n) = target_note{
+                    (note - n as f32).abs() < 0.01
+                }
+                else { true };
+                if ok{
                     *t = 0;
+                    *vel = v;
                 }
             }
             if *t + i >= sample.len() {
                 buf.l[i] = 0.0;
                 buf.r[i] = 0.0;
             } else {
-                buf.l[i] = sample.l[*t + i];
-                buf.r[i] = sample.r[*t + i];
+                buf.l[i] = sample.l[*t + i] * *vel;
+                buf.r[i] = sample.r[*t + i] * *vel;
             }
         }
         *t += len;

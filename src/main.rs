@@ -191,15 +191,16 @@ impl State{
         file.read_to_string(&mut self.contents).unwrap();
 
         let mut new_samples = Vec::new();
-        let mut new_sums = Vec::new();
-        let mut new_norms = Vec::new();
-        let mut new_sampleloops = Vec::new();
-        let mut sampleflowws = Vec::new();
-        let mut new_edges = Vec::new();
         let mut new_lv2plugins = Vec::new();
         let mut new_lv2params = Vec::new();
-        let mut new_lv2fxs = Vec::new();
         let mut midis = Vec::new();
+
+        let mut sums = Vec::new();
+        let mut norms = Vec::new();
+        let mut sampleloops = Vec::new();
+        let mut sampleflowws = Vec::new();
+        let mut lv2fxs = Vec::new();
+        let mut edges = Vec::new();
 
         let mut cs = self.cs;
         let mut render_sr = self.render_sr;
@@ -232,7 +233,7 @@ impl State{
                 Ok(())
             })?)?;
             // load_midi(name, file)
-            self.lua.globals().set("load_midi", scope.create_function_mut(|_, seed: (String, String)| {
+            self.lua.globals().set("load_midi_floww", scope.create_function_mut(|_, seed: (String, String)| {
                 midis.push(seed);
                 Ok(())
             })?)?;
@@ -249,17 +250,17 @@ impl State{
             // ---- Graph
             // add_sum(name, gain, angle)
             self.lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-                new_sums.push(seed);
+                sums.push(seed);
                 Ok(())
             })?)?;
             // add_normalize(name, gain, angle)
             self.lua.globals().set("add_normalize", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-                new_norms.push(seed);
+                norms.push(seed);
                 Ok(())
             })?)?;
             // add_sampleloop(name, gain, angle, sample)
             self.lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-                new_sampleloops.push(seed);
+                sampleloops.push(seed);
                 Ok(())
             })?)?;
             // add_samplefloww(name, gain, angle, sample, floww)
@@ -269,12 +270,12 @@ impl State{
             })?)?;
             // add_lv2fx(name, gain, angle, plugin)
             self.lua.globals().set("add_lv2fx", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-                new_lv2fxs.push(seed);
+                lv2fxs.push(seed);
                 Ok(())
             })?)?;
             // connect(name, name)
             self.lua.globals().set("connect", scope.create_function_mut(|_, seed: (String, String)| {
-                new_edges.push(seed);
+                edges.push(seed);
                 Ok(())
             })?)?;
             self.lua.globals().set("set_output", scope.create_function_mut(|_, out: String| {
@@ -323,7 +324,7 @@ impl State{
         for (name, file) in midis{
             self.fb.add_drum_floww(name, &file);
         }
-        // same for plugins
+        // Also don't recreate plugins
         // TODO: make renaming possible
         let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
         for (name, _) in neg { // TODO: make plugins removable
@@ -347,9 +348,9 @@ impl State{
         // probably :)
         println!("Status: rebuilding graph.");
         self.g.reset();
-        for (name, gain, angle) in &new_sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
-        for (name, gain, angle) in &new_norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
-        for (name, gain, angle, sample) in &new_sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
+        for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
+        for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
+        for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
         for (name, gain, angle, sample, floww, note) in &sampleflowws {
             let sample = self.sb.get_index(&sample).unwrap();
             let floww = self.fb.get_index(&floww).unwrap();
@@ -357,8 +358,8 @@ impl State{
             else { Some(*note as usize) };
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww(sample, floww, note)), name.to_owned());
         }
-        for (name, gain, angle, plugin) in &new_lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
-        for (a, b) in &new_edges { self.g.connect(a, b); }
+        for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
+        for (a, b) in &edges { self.g.connect(a, b); }
 
         self.g.set_output(&self.output_vertex);
         if !self.g.check_graph(){

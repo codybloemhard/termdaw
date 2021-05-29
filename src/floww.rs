@@ -75,14 +75,14 @@ impl FlowwBank{
         self.block_index = self.drum_start_indices[index];
     }
 
-    pub fn get_block(&mut self, index: usize, offset_frame: usize) -> Option<DrumPoint>{
+    pub fn get_block(&mut self, index: usize, offset_frame: usize) -> Option<(f32, f32)>{
         if index >= self.drum_flowws.len() { return None; }
         let next_event = self.drum_flowws[index][self.block_index];
         if next_event.0 == self.frame + offset_frame{
             if self.block_index + 1 < self.drum_flowws[index].len() {
                 self.block_index += 1;
             }
-            Some(next_event)
+            Some((next_event.1, next_event.2))
         } else {
             None
         }
@@ -101,7 +101,7 @@ pub fn mono_midi_to_drum_floww(midi: MIDI, sr: usize) -> DrumFloww{
         for (tick, id) in track{
             if let Some(NoteOn(note, _, vel)) = midi.get_event(id) {
                 time += tick;
-                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, vel as f32));
+                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, vel as f32 / 127.0));
             }
             if let Some(NoteOff(_, _, _)) = midi.get_event(id){
                 time += tick;
