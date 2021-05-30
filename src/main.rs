@@ -198,7 +198,7 @@ impl State{
         let mut sums = Vec::new();
         let mut norms = Vec::new();
         let mut sampleloops = Vec::new();
-        let mut sampleflowws = Vec::new();
+        let mut sampleflowwsmulti = Vec::new();
         let mut lv2fxs = Vec::new();
         let mut edges = Vec::new();
 
@@ -264,8 +264,8 @@ impl State{
                 Ok(())
             })?)?;
             // add_samplefloww(name, gain, angle, sample, floww)
-            self.lua.globals().set("add_samplefloww", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32)| {
-                sampleflowws.push(seed);
+            self.lua.globals().set("add_samplefloww_multi", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32)| {
+                sampleflowwsmulti.push(seed);
                 Ok(())
             })?)?;
             // add_lv2fx(name, gain, angle, plugin)
@@ -351,12 +351,12 @@ impl State{
         for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
-        for (name, gain, angle, sample, floww, note) in &sampleflowws {
+        for (name, gain, angle, sample, floww, note) in &sampleflowwsmulti {
             let sample = self.sb.get_index(&sample).unwrap();
             let floww = self.fb.get_index(&floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww(sample, floww, note)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww_multi(sample, floww, note)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (a, b) in &edges { self.g.connect(a, b); }

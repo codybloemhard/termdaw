@@ -2,7 +2,7 @@ use crate::sample::{ Sample, SampleBank };
 use crate::floww::{ FlowwBank };
 use lv2hm::Lv2Host;
 
-use std::collections::{ HashMap };
+use std::collections::{ HashMap, VecDeque };
 
 pub struct Graph{
     vertices: Vec<Vertex>,
@@ -226,13 +226,12 @@ pub enum VertexExt{
         playing: bool,
         t: usize,
     },
-    SampleFloww{
+    SampleFlowwMulti{
         sample_index: usize,
         floww_index: usize,
         note: Option<usize>,
         playing: bool,
-        t: usize,
-        vel: f32,
+        ts: VecDeque<(i64, f32)>,
     },
     Lv2fx{
         index: usize,
@@ -258,14 +257,13 @@ impl VertexExt{
         }
     }
 
-    pub fn sample_floww(sample_index: usize, floww_index: usize, note: Option<usize>) -> Self{
-        Self::SampleFloww{
+    pub fn sample_floww_multi(sample_index: usize, floww_index: usize, note: Option<usize>) -> Self{
+        Self::SampleFlowwMulti{
             sample_index,
             floww_index,
             playing: true,
-            t: 0,
+            ts: VecDeque::new(),
             note,
-            vel: 1.0,
         }
     }
 
@@ -290,8 +288,8 @@ impl VertexExt{
             Self::SampleLoop { playing, t, sample_index } => {
                 sample_loop_gen(buf, sb, len, playing, t, *sample_index);
             },
-            Self::SampleFloww { playing, t, sample_index, floww_index, note, vel } => {
-                sample_floww_gen(buf, sb, fb, len, playing, t, *sample_index, *floww_index, *note, vel);
+            Self::SampleFlowwMulti { playing, ts, sample_index, floww_index, note } => {
+                sample_floww_multi_gen(buf, sb, fb, len, playing, ts, *sample_index, *floww_index, *note);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -306,7 +304,7 @@ impl VertexExt{
             Self::Sum => true,
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
-            Self::SampleFloww { .. } => false,
+            Self::SampleFlowwMulti { .. } => false,
             Self::Lv2fx { .. } => true,
          }
     }
@@ -350,7 +348,7 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, playing: &mut 
     }
 }
 
-fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, t: &mut usize, sample_index: usize, floww_index: usize, target_note: Option<usize>, vel: &mut f32){
+fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize, target_note: Option<usize>){
     if *playing{
         let sample = sb.get_sample(sample_index);
         fb.start_block(floww_index);
@@ -361,19 +359,28 @@ fn sample_floww_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: 
                 }
                 else { true };
                 if ok{
-                    *t = 0;
-                    *vel = v;
+                    ts.push_back((-(i as i64), v)); // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
                 }
             }
-            if *t + i >= sample.len() {
-                buf.l[i] = 0.0;
-                buf.r[i] = 0.0;
-            } else {
-                buf.l[i] = sample.l[*t + i] * *vel;
-                buf.r[i] = sample.r[*t + i] * *vel;
+            buf.l[i] = 0.0;
+            buf.r[i] = 0.0;
+            let mut pops = 0;
+            for (t, vel) in ts.iter(){
+                let pos = (*t + i as i64).max(0) as usize;
+                if pos >= sample.len() {
+                    pops += 1;
+                } else {
+                    buf.l[i] += sample.l[pos] * *vel;
+                    buf.r[i] += sample.r[pos] * *vel;
+                }
+            }
+            for _ in 0..pops{
+                ts.pop_front();
             }
         }
-        *t += len;
+        for (t, _) in ts{
+            *t += len as i64;
+        }
     } else {
         buf.zero();
     }
