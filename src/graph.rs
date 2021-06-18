@@ -353,7 +353,7 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
         let sample = sb.get_sample(sample_index);
         fb.start_block(floww_index);
         for i in 0..len{
-            if let Some((note, v)) = fb.get_block(floww_index, i){
+            if let Some((note, v)) = fb.get_block_drum(floww_index, i){
                 let ok = if let Some(n) = target_note{
                     (note - n as f32).abs() < 0.01
                 }

@@ -9,9 +9,9 @@ pub struct FlowwBank{
     bl: usize,
     frame: usize,
     block_index: usize,
-    drum_flowws: Vec<DrumFloww>,
-    drum_start_indices: Vec<usize>,
-    drum_names: HashMap<String, usize>,
+    flowws: Vec<Floww>,
+    start_indices: Vec<usize>,
+    names: HashMap<String, usize>,
 }
 
 impl FlowwBank{
@@ -22,24 +22,24 @@ impl FlowwBank{
     pub fn reset(&mut self){
         self.frame = 0;
         self.block_index = 0;
-        self.drum_flowws.clear();
-        self.drum_start_indices.clear();
-        self.drum_names.clear();
+        self.flowws.clear();
+        self.start_indices.clear();
+        self.names.clear();
     }
 
-    pub fn add_drum_floww(&mut self, name: String, path: &str){
+    pub fn add_floww(&mut self, name: String, path: &str){
         if let Ok(midi) = MIDI::from_path(path){
-            let floww = mono_midi_to_drum_floww(midi, self.sr);
-            self.drum_flowws.push(floww);
-            self.drum_start_indices.push(0);
-            self.drum_names.insert(name, self.drum_flowws.len() - 1);
+            let floww = mono_midi_to_floww(midi, self.sr);
+            self.flowws.push(floww);
+            self.start_indices.push(0);
+            self.names.insert(name, self.flowws.len() - 1);
         } else {
             println!("Could not read midi file: {}", path);
         }
     }
 
     pub fn get_index(&self, name: &str) -> Option<usize>{
-        if let Some(index) = self.drum_names.get(name){
+        if let Some(index) = self.names.get(name){
             Some(*index)
         } else {
             None
@@ -47,12 +47,12 @@ impl FlowwBank{
     }
 
     fn set_start_indices_to_frame(&mut self, t_frame: usize, do_skip: bool){
-        for (i, floww) in self.drum_flowws.iter().enumerate(){
-            let skip = if do_skip{ self.drum_start_indices[i] }
+        for (i, floww) in self.flowws.iter().enumerate(){
+            let skip = if do_skip{ self.start_indices[i] }
             else { 0 };
             for (j, (frame, _, _)) in floww.iter().enumerate().skip(skip){
                 if frame >= &t_frame{
-                    self.drum_start_indices[i] = j;
+                    self.start_indices[i] = j;
                     break;
                 }
             }
@@ -71,64 +71,55 @@ impl FlowwBank{
     }
 
     pub fn start_block(&mut self, index: usize){
-        if index >= self.drum_flowws.len() { return; }
-        self.block_index = self.drum_start_indices[index];
+        if index >= self.flowws.len() { return; }
+        self.block_index = self.start_indices[index];
     }
 
-    pub fn get_block(&mut self, index: usize, offset_frame: usize) -> Option<(f32, f32)>{
-        if index >= self.drum_flowws.len() { return None; }
-        let next_event = self.drum_flowws[index][self.block_index];
-        if next_event.0 == self.frame + offset_frame{
-            if self.block_index + 1 < self.drum_flowws[index].len() {
-                self.block_index += 1;
+    // returns Option<(note, vel)>
+    pub fn get_block_drum(&mut self, index: usize, offset_frame: usize) -> Option<(f32, f32)>{
+        if index >= self.flowws.len() { return None; }
+        loop{
+            if self.block_index >= self.flowws[index].len(){
+                return None;
             }
-            Some((next_event.1, next_event.2))
-        } else {
-            None
+            let next_event = self.flowws[index][self.block_index];
+            // this skips events when multiple on values are in the same time frame
+            if next_event.0 < self.frame + offset_frame{
+                self.block_index += 1;
+                continue;
+            }
+            if next_event.0 == self.frame + offset_frame{
+                self.block_index += 1;
+                // Only send through if it's a hit, ignore note off's
+                if next_event.2 > 0.001{
+                    return Some((next_event.1, next_event.2))
+                }
+            } else {
+                return None;
+            }
         }
     }
 }
 
 // (frame, note, vel)
-pub type DrumPoint = (usize, f32, f32);
-pub type DrumFloww = Vec<DrumPoint>;
+pub type Point = (usize, f32, f32);
+pub type Floww = Vec<Point>;
 
-pub fn mono_midi_to_drum_floww(midi: MIDI, sr: usize) -> DrumFloww{
+pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
     let ppqn = midi.get_ppqn() as f32;
     let mut floww = Vec::new();
     for track in midi.get_tracks(){
         let mut time = 0;
         for (tick, id) in track{
+            time += tick;
             if let Some(NoteOn(note, _, vel)) = midi.get_event(id) {
-                time += tick;
                 floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, vel as f32 / 127.0));
             }
-            if let Some(NoteOff(_, _, _)) = midi.get_event(id){
-                time += tick;
+            if let Some(NoteOff(note, _, _)) = midi.get_event(id){
+                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, 0.0));
             }
         }
     }
-    floww.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
     floww
 }
 
-// pub fn mono_midi_to_drum_floww(midi: MIDI) -> DrumFloww{
-//     let mut floww = Vec::new();
-//     let mut map = HashMap::new();
-//     for track in midi.get_tracks(){
-//         for (tick, id) in track{
-//             match midi.get_event(id){
-//                 Some(NoteOn(_ch, note, vel)) => {
-//                     map.insert(note, (vel, tick));
-//                 },
-//                 Some(NoteOff(_ch, note, _vel)) => {
-//                     if let Some((on_vel, on_tick)) = map.get(&note){
-//                         floww.push((tick as f32, *on_vel as f32, (tick - on_tick) as f32));
-//                     }
-//                 },
-//                 _ => {  },
-//             }
-//         }
-//     }
-//     floww
-// }

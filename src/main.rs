@@ -322,7 +322,7 @@ impl State{
         // Just reload all midi, so you can easily import newly inplace generated files
         self.fb.reset();
         for (name, file) in midis{
-            self.fb.add_drum_floww(name, &file);
+            self.fb.add_floww(name, &file);
         }
         // Also don't recreate plugins
         // TODO: make renaming possible
