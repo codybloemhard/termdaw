@@ -233,6 +233,9 @@ pub enum VertexExt{
         playing: bool,
         ts: VecDeque<(i64, f32)>,
     },
+    SineFloww{
+        floww_index: usize,
+    },
     Lv2fx{
         index: usize,
     }
@@ -267,6 +270,12 @@ impl VertexExt{
         }
     }
 
+    pub fn sine_floww(floww_index: usize) -> Self{
+        Self::SineFloww{
+            floww_index,
+        }
+    }
+
     pub fn lv2fx(plugin_index: usize) -> Self{
         Self::Lv2fx{
             index: plugin_index,
@@ -291,6 +300,9 @@ impl VertexExt{
             Self::SampleFlowwMulti { playing, ts, sample_index, floww_index, note } => {
                 sample_floww_multi_gen(buf, sb, fb, len, playing, ts, *sample_index, *floww_index, *note);
             },
+            Self::SineFloww { floww_index } => {
+                sine_floww_gen(buf, fb, len, *floww_index);
+            },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
             },
@@ -305,6 +317,7 @@ impl VertexExt{
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
             Self::SampleFlowwMulti { .. } => false,
+            Self::SineFloww { .. } => false,
             Self::Lv2fx { .. } => true,
          }
     }
@@ -383,6 +396,15 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
         }
     } else {
         buf.zero();
+    }
+}
+
+fn sine_floww_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize){
+    fb.start_block(floww_index);
+    for i in 0..len{
+        for (on, note, vel) in fb.get_block_simple(floww_index, i){
+
+        }
     }
 }
 

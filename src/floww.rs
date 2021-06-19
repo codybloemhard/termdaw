@@ -50,7 +50,7 @@ impl FlowwBank{
         for (i, floww) in self.flowws.iter().enumerate(){
             let skip = if do_skip{ self.start_indices[i] }
             else { 0 };
-            for (j, (frame, _, _)) in floww.iter().enumerate().skip(skip){
+            for (j, (frame, _, _, _)) in floww.iter().enumerate().skip(skip){
                 if frame >= &t_frame{
                     self.start_indices[i] = j;
                     break;
@@ -91,18 +91,42 @@ impl FlowwBank{
             if next_event.0 == self.frame + offset_frame{
                 self.block_index += 1;
                 // Only send through if it's a hit, ignore note off's
-                if next_event.2 > 0.001{
-                    return Some((next_event.1, next_event.2))
+                if next_event.3 > 0.001{
+                    return Some((next_event.2, next_event.3))
                 }
             } else {
                 return None;
             }
         }
     }
+
+    // returns Vec<(on?, note, vel)>
+    pub fn get_block_simple(&mut self, index: usize, offset_frame: usize) -> Vec<(bool, f32, f32)>{
+        let mut res = Vec::new();
+        if index >= self.flowws.len() { return res; }
+        loop{
+            if self.block_index >= self.flowws[index].len(){
+                break;
+            }
+            let next_event = self.flowws[index][self.block_index];
+            if next_event.0 == self.frame + offset_frame{
+                self.block_index += 1;
+                let on = next_event.3 > 0.001;
+                res.push((on, next_event.2, next_event.3));
+            } else {
+                break;
+            }
+        }
+        res
+    }
+
+    // returns Vec<(note, vel)>
+    // pub fn get_block_continuous(&mut self, index: usize, offset_frame: usize) -> Vec<(f32, f32)>{
+    // }
 }
 
-// (frame, note, vel)
-pub type Point = (usize, f32, f32);
+// (frame, id, note, vel)
+pub type Point = (usize, usize, f32, f32);
 pub type Floww = Vec<Point>;
 
 pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
@@ -113,10 +137,10 @@ pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
         for (tick, id) in track{
             time += tick;
             if let Some(NoteOn(note, _, vel)) = midi.get_event(id) {
-                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, vel as f32 / 127.0));
+                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, vel as f32 / 127.0));
             }
             if let Some(NoteOff(note, _, _)) = midi.get_event(id){
-                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as f32, 0.0));
+                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, 0.0));
             }
         }
     }

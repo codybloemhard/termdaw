@@ -26,14 +26,13 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sum vertex
   - [x] Normalize vertex
   - [x] Sample loop vertex
+  - [ ] Envelope floww vertex
   - [x] Sample floww multi vertex
   - [ ] Sample floww lerp vertex
   - [x] Lv2 fx vertex
   - [ ] Buildin floww synth
 - Floww
   - [ ] Read from midi
-  - [ ] Read from floww
-  - [ ] Linear interpolation of notes
 - Lua
   - [x] To configure the project(sample rate, etc)
   - [x] Load resources (samples and plugins)
@@ -48,6 +47,8 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Lv2 midi instrument vertex
 - [ ] Envelope vertex
 - [ ] Lufs mastering tool
+- [ ] Read floww from floww description
+- [ ] Linear interpolation of floww notes
 
 ## Example
 ```toml
