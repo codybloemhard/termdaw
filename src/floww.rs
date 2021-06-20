@@ -136,10 +136,10 @@ pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
         let mut time = 0;
         for (tick, id) in track{
             time += tick;
-            if let Some(NoteOn(note, _, vel)) = midi.get_event(id) {
+            if let Some(NoteOn(_, note, vel)) = midi.get_event(id) {
                 floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, vel as f32 / 127.0));
             }
-            if let Some(NoteOff(note, _, _)) = midi.get_event(id){
+            if let Some(NoteOff(_, note, _)) = midi.get_event(id){
                 floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, 0.0));
             }
         }

@@ -3,6 +3,7 @@ use crate::floww::{ FlowwBank };
 use lv2hm::Lv2Host;
 
 use std::collections::{ HashMap, VecDeque };
+use core::f32::consts::PI;
 
 pub struct Graph{
     vertices: Vec<Vertex>,
@@ -10,20 +11,24 @@ pub struct Graph{
     names: Vec<String>,
     name_map: HashMap<String, usize>,
     ran_status: Vec<bool>,
-    max_buffer_len: usize,
     output_vertex: Option<usize>,
+    max_buffer_len: usize,
+    sr: usize,
+    t: usize,
 }
 
 impl Graph{
-    pub fn new(max_buffer_len: usize) -> Self{
+    pub fn new(max_buffer_len: usize, sr: usize) -> Self{
         Self{
             vertices: Vec::new(),
             edges: Vec::new(),
             name_map: HashMap::new(),
             names: Vec::new(),
             ran_status: Vec::new(),
-            max_buffer_len,
             output_vertex: None,
+            max_buffer_len,
+            sr,
+            t: 0,
         }
     }
 
@@ -34,6 +39,7 @@ impl Graph{
         self.names.clear();
         self.ran_status.clear();
         self.output_vertex = None;
+        self.t = 0;
     }
 
     pub fn add(&mut self, node: Vertex, name: String){
@@ -83,13 +89,13 @@ impl Graph{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, index: usize, is_scan: bool){
+    fn run_vertex(&mut self, t: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
         let edges = self.edges[index].clone();
         for incoming in &edges{
-            self.run_vertex(sb, fb, host, *incoming, is_scan);
+            self.run_vertex(t, sb, fb, host, *incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
         // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
@@ -98,7 +104,7 @@ impl Graph{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(sb, fb, host, self.max_buffer_len, is_scan, ins);
+            self.vertices[index].generate(t, self.sr, sb, fb, host, self.max_buffer_len, is_scan, ins);
         }
     }
 
@@ -151,7 +157,8 @@ impl Graph{
     pub fn render(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
-            self.run_vertex(sb, fb, host, index, false);
+            self.run_vertex(self.t, sb, fb, host, index, false);
+            self.t += self.max_buffer_len;
             Some(self.vertices[index].read_buffer())
         } else {
             None
@@ -162,9 +169,9 @@ impl Graph{
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         fb.set_time(0.0);
-        for _ in 0..chunks {
+        for j in 0..chunks {
             self.reset_ran_stati();
-            self.run_vertex(sb, fb, host, i, true);
+            self.run_vertex(j * self.max_buffer_len, sb, fb, host, i, true);
             fb.set_time_to_next_block();
         }
         self.set_time(0);
@@ -193,9 +200,9 @@ impl Vertex{
         &self.buf
     }
 
-    fn generate(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
+    fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
-        self.ext.generate(sb, fb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
+        self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
     }
 
     // Whether or not you can connect another vertex to (into) this one
@@ -235,6 +242,7 @@ pub enum VertexExt{
     },
     SineFloww{
         floww_index: usize,
+        notes: Vec<(f32, f32)>,
     },
     Lv2fx{
         index: usize,
@@ -273,6 +281,7 @@ impl VertexExt{
     pub fn sine_floww(floww_index: usize) -> Self{
         Self::SineFloww{
             floww_index,
+            notes: Vec::new(),
         }
     }
 
@@ -286,7 +295,7 @@ impl VertexExt{
         if let Self::SampleLoop{ t, .. } = self { *t = time; }
     }
 
-    fn generate(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
         match self{
             Self::Sum => {
                 sum_gen(buf, len, res);
@@ -300,8 +309,8 @@ impl VertexExt{
             Self::SampleFlowwMulti { playing, ts, sample_index, floww_index, note } => {
                 sample_floww_multi_gen(buf, sb, fb, len, playing, ts, *sample_index, *floww_index, *note);
             },
-            Self::SineFloww { floww_index } => {
-                sine_floww_gen(buf, fb, len, *floww_index);
+            Self::SineFloww { floww_index, notes } => {
+                sine_floww_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -399,11 +408,35 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
     }
 }
 
-fn sine_floww_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize){
+fn sine_floww_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
+            if on{
+                let mut has = false;
+                for (n, v) in notes.iter_mut(){
+                    if (*n - note).abs() < 0.001{
+                        *v = vel;
+                        has = true;
+                        break;
+                    }
+                }
+                if !has {
+                    notes.push((note, vel));
+                }
+            } else {
+                notes.retain(|x| (x.0 - note).abs() > 0.001);
+            }
+        }
 
+        buf.l[i] = 0.0;
+        buf.r[i] = 0.0;
+        for (note, vel) in notes.iter(){
+            let time = (t + i) as f32 / sr as f32;
+            let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
+            let s = (time * hz * 2.0 * PI).sin() * vel;
+            buf.l[i] += s;
+            buf.r[i] += s;
         }
     }
 }

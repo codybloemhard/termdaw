@@ -32,7 +32,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Lv2 fx vertex
   - [ ] Buildin floww synth
 - Floww
-  - [ ] Read from midi
+  - [x] Read from midi
 - Lua
   - [x] To configure the project(sample rate, etc)
   - [x] Load resources (samples and plugins)
