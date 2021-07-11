@@ -408,6 +408,44 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
     }
 }
 
+fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, sample_index: usize, floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
+    if *playing{
+        let sample = sb.get_sample(sample_index);
+        fb.start_block(floww_index);
+        for i in 0..len{
+            if let Some((note, v)) = fb.get_block_drum(floww_index, i){
+                let ok = if let Some(n) = target_note{
+                    (note - n as f32).abs() < 0.01
+                }
+                else { true };
+                if ok{
+                    *ghost = *primary;
+                    *primary = (-(i as i64), v); // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
+                    *countdown = lerp_len;
+                }
+            }
+            let primary_pos = (primary.0 + i as i64).max(0) as usize;
+            let mut l = sample.l[primary_pos] * primary.1;
+            let mut r = sample.r[primary_pos] * primary.1;
+            if *countdown > 0{
+                *countdown -= 1;
+                let t = *countdown as f32 / lerp_len as f32;
+                let ghost_pos = (ghost.0 + i as i64).max(0) as usize;
+                let gl = sample.l[ghost_pos] * ghost.1;
+                let gr = sample.r[ghost_pos] * ghost.1;
+                l = gl * t + l * (1.0 - t);
+                r = gr * t + r * (1.0 - t);
+            }
+            buf.l[i] = l;
+            buf.r[i] = r;
+        }
+        primary.0 += len as i64;
+        ghost.0 += len as i64;
+    } else {
+        buf.zero();
+    }
+}
+
 fn sine_floww_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{

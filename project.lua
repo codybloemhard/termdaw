@@ -14,7 +14,7 @@ load_midi_floww("test", "/home/cody/git/music-gen/comping0.midi");
 
 add_samplefloww_multi("one", 1.0, 0.0, "snare", "snare", -1);
 add_samplefloww_multi("two", 1.0, 0.0, "kick", "bassd", -1);
-add_sinefloww("three", 1.0, 0.0, "test");
+add_sinefloww("three", 0.2, 0.0, "test");
 -- add_sampleloop("one", 1.0, 0.0, "snare");
 -- add_sampleloop("two", 1.0, 0.0, "kick");
 add_normalize("sum", 1.0, 0.0);
