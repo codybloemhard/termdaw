@@ -199,6 +199,7 @@ impl State{
         let mut norms = Vec::new();
         let mut sampleloops = Vec::new();
         let mut sampleflowwsmulti = Vec::new();
+        let mut sampleflowwslerp = Vec::new();
         let mut sineflowws = Vec::new();
         let mut lv2fxs = Vec::new();
         let mut edges = Vec::new();
@@ -267,6 +268,11 @@ impl State{
             // add_samplefloww(name, gain, angle, sample, floww, note)
             self.lua.globals().set("add_samplefloww_multi", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32)| {
                 sampleflowwsmulti.push(seed);
+                Ok(())
+            })?)?;
+            // add_samplefloww(name, gain, angle, sample, floww, note, lerp_len)
+            self.lua.globals().set("add_samplefloww_lerp", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32, i32)| {
+                sampleflowwslerp.push(seed);
                 Ok(())
             })?)?;
             // add_sinefloww(name, gain, angle, floww)
@@ -350,7 +356,7 @@ impl State{
             self.host.set_value(&plugin, &name, value);
         }
 
-        // just rebuild the damn thing, if it becomes problamatic i'll do something about it,
+        // just rebuild the damn thing, if it becomes problematic i'll do something about it,
         // probably :)
         println!("Status: rebuilding graph.");
         self.g.reset();
@@ -363,6 +369,14 @@ impl State{
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww_multi(sample, floww, note)), name.to_owned());
+        }
+        for (name, gain, angle, sample, floww, note, lerp_len) in &sampleflowwslerp {
+            let sample = self.sb.get_index(&sample).unwrap();
+            let floww = self.fb.get_index(&floww).unwrap();
+            let note = if note < &0 { None }
+            else { Some(*note as usize) };
+            let lerp_len = (*lerp_len).max(0) as usize;
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww_lerp(sample, floww, note, lerp_len)), name.to_owned());
         }
         for (name, gain, angle, floww) in &sineflowws {
             let floww = self.fb.get_index(&floww).unwrap();

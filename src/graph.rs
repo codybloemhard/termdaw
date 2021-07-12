@@ -240,6 +240,16 @@ pub enum VertexExt{
         playing: bool,
         ts: VecDeque<(i64, f32)>,
     },
+    SampleFlowwLerp{
+        sample_index: usize,
+        floww_index: usize,
+        note: Option<usize>,
+        lerp_len: usize,
+        countdown: usize,
+        primary: (i64, f32),
+        ghost: (i64, f32),
+        playing: bool,
+    },
     SineFloww{
         floww_index: usize,
         notes: Vec<(f32, f32)>,
@@ -272,9 +282,22 @@ impl VertexExt{
         Self::SampleFlowwMulti{
             sample_index,
             floww_index,
-            playing: true,
             ts: VecDeque::new(),
             note,
+            playing: true,
+        }
+    }
+
+    pub fn sample_floww_lerp(sample_index: usize, floww_index: usize, note: Option<usize>, lerp_len: usize) -> Self{
+        Self::SampleFlowwLerp{
+            sample_index,
+            floww_index,
+            note,
+            lerp_len,
+            countdown: 0,
+            primary: (0, 0.0),
+            ghost: (0, 0.0),
+            playing: true,
         }
     }
 
@@ -309,6 +332,9 @@ impl VertexExt{
             Self::SampleFlowwMulti { playing, ts, sample_index, floww_index, note } => {
                 sample_floww_multi_gen(buf, sb, fb, len, playing, ts, *sample_index, *floww_index, *note);
             },
+            Self::SampleFlowwLerp { playing, sample_index, floww_index, note, countdown, lerp_len, primary, ghost } => {
+                sample_floww_lerp_gen(buf, sb, fb, len, playing, *sample_index, *floww_index, *note, *lerp_len, countdown, primary, ghost);
+            },
             Self::SineFloww { floww_index, notes } => {
                 sine_floww_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
@@ -326,6 +352,7 @@ impl VertexExt{
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
             Self::SampleFlowwMulti { .. } => false,
+            Self::SampleFlowwLerp { .. } => false,
             Self::SineFloww { .. } => false,
             Self::Lv2fx { .. } => true,
          }
@@ -408,7 +435,8 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
     }
 }
 
-fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, sample_index: usize, floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
+fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, playing: &mut bool, sample_index: usize,
+    floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
     if *playing{
         let sample = sb.get_sample(sample_index);
         fb.start_block(floww_index);
@@ -424,13 +452,13 @@ fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, 
                     *countdown = lerp_len;
                 }
             }
-            let primary_pos = (primary.0 + i as i64).max(0) as usize;
+            let primary_pos = ((primary.0 + i as i64).max(0) as usize).min(sample.len() - 1);
             let mut l = sample.l[primary_pos] * primary.1;
             let mut r = sample.r[primary_pos] * primary.1;
             if *countdown > 0{
                 *countdown -= 1;
                 let t = *countdown as f32 / lerp_len as f32;
-                let ghost_pos = (ghost.0 + i as i64).max(0) as usize;
+                let ghost_pos = ((ghost.0 + i as i64).max(0) as usize).min(sample.len() - 1);
                 let gl = sample.l[ghost_pos] * ghost.1;
                 let gr = sample.r[ghost_pos] * ghost.1;
                 l = gl * t + l * (1.0 - t);
