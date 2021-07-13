@@ -10,7 +10,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Play back audio
 - Terminal UX
     - [x] Controls: play, pause, stop
-    - [ ] Controls: set time, dash in time
+    - [x] Controls: set/get time, dash in time
     - [x] Controls: refresh, render
     - [ ] View: Terminal logging, warnings, errors, colors
     - [x] Toml configuration
@@ -26,11 +26,12 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sum vertex
   - [x] Normalize vertex
   - [x] Sample loop vertex
-  - [ ] Envelope floww vertex
-  - [x] Sample floww multi vertex
-  - [x] Sample floww lerp vertex
+  - [ ] Envelope vertex
+  - [x] Sample multi vertex
+  - [x] Sample lerp vertex
   - [x] Lv2 fx vertex
-  - [ ] Buildin floww synth
+  - [ ] Simple synth vertex
+  - [ ] Wavetable synth vertex
 - Floww
   - [x] Read from midi
 - Lua

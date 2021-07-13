@@ -23,6 +23,6 @@ add_normalize("sum", 1.0, 0.0);
 connect("one", "sum");
 -- connect("crush", "sum");
 connect("two", "sum");
--- connect("three", "sum");
+--connect("three", "sum");
 
 set_output("sum");

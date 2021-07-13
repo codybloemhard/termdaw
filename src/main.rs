@@ -10,6 +10,7 @@ use serde::Deserialize;
 use skim::prelude::*;
 use sdl2::audio::AudioSpecDesired;
 use lv2hm::Lv2Host;
+use term_basics_linux as tbl;
 
 mod sample;
 mod graph;
@@ -36,6 +37,7 @@ fn main() -> Result<(), String>{
     contents.clear();
     file.read_to_string(&mut contents).unwrap();
     std::mem::drop(file);
+    let config_copy = config.clone();
 
     let mut state = State{
         lua: Lua::new(),
@@ -56,6 +58,8 @@ fn main() -> Result<(), String>{
     };
     state.refresh()?;
 
+    let config = config_copy;
+
     let sdl_context = sdl2::init()?;
     let audio_subsystem = sdl_context.audio()?;
     let desired_spec = AudioSpecDesired {
@@ -74,7 +78,7 @@ fn main() -> Result<(), String>{
     thread::spawn(move || {
         let options = SkimOptionsBuilder::default()
             .height(Some("8%")).build().unwrap();
-        let input = "quit\nrender\nrefresh\nplay\npause\nstop".to_string();
+        let input = "quit\nrender\nrefresh\nplay\npause\nstop\n>skip\n<prev\nset\nget".to_string();
         let item_reader = SkimItemReader::default();
         loop{
             let items = item_reader.of_bufread(Cursor::new(input.clone()));
@@ -85,12 +89,31 @@ fn main() -> Result<(), String>{
             if let Some(item) = selected_items.get(0){
                 let command = item.output();
                 println!("---- {}", command);
-                let tmsg = if command == "quit"{ ThreadMsg::Quit }
-                else if command == "refresh"{ ThreadMsg::Refresh }
-                else if command == "render"{ ThreadMsg::Render }
-                else if command == "play"{ ThreadMsg::Play }
-                else if command == "pause"{ ThreadMsg::Pause }
+                let tmsg = if command == "quit" { ThreadMsg::Quit }
+                else if command == "refresh" { ThreadMsg::Refresh }
+                else if command == "render" { ThreadMsg::Render }
+                else if command == "play" { ThreadMsg::Play }
+                else if command == "pause" { ThreadMsg::Pause }
                 else if command == "stop" { ThreadMsg::Stop }
+                else if command == ">skip" { ThreadMsg::Skip }
+                else if command == "<prev" { ThreadMsg::Prev }
+                else if command == "set" {
+                    let raw = tbl::input_field();
+                    let time: Option<f32> = tbl::string_to_value(&raw);
+                    if let Some(float) = time{
+                        if float >= 0.0{
+                            let t = (float * config.settings.project_samplerate as f32) as usize;
+                            ThreadMsg::Set(t)
+                        } else {
+                            println!("Error: time needs to be positive.");
+                            ThreadMsg::None
+                        }
+                    } else {
+                        println!("Error: could not parse time, did not set time.");
+                        ThreadMsg::None
+                    }
+                }
+                else if command == "get" { ThreadMsg::Get }
                 else { ThreadMsg::None };
                 transmit_to_main.send(tmsg).unwrap();
             } else {
@@ -134,7 +157,33 @@ fn main() -> Result<(), String>{
                     device.pause();
                     device.clear();
                     state.g.set_time(0);
-                    state.fb.set_time(0.0);
+                    state.fb.set_time(0);
+                },
+                ThreadMsg::Skip => {
+                    device.pause();
+                    device.clear();
+                    let time = state.g.change_time(5 * state.config.settings.project_samplerate, true);
+                    state.fb.set_time(time);
+                    device.resume();
+                }
+                ThreadMsg::Prev => {
+                    device.pause();
+                    device.clear();
+                    let time = state.g.change_time(5 * state.config.settings.project_samplerate, false);
+                    state.fb.set_time(time);
+                    device.resume();
+                }
+                ThreadMsg::Set(time) => {
+                    device.pause();
+                    device.clear();
+                    state.g.set_time(time);
+                    state.fb.set_time(time);
+                    device.resume();
+                }
+                ThreadMsg::Get => {
+                    let t = state.g.get_time();
+                    let tf = t as f32 / state.config.settings.project_samplerate as f32;
+                    println!("Frame: {}, Time: {}", t, tf);
                 }
                 _ => {}
             }
@@ -160,7 +209,7 @@ fn main() -> Result<(), String>{
 
 #[derive(PartialEq)]
 pub enum ThreadMsg{
-    None, Ready, Quit, Refresh, Render, Play, Pause, Stop,
+    None, Ready, Quit, Refresh, Render, Play, Pause, Stop, Skip, Prev, Set(usize), Get
 }
 
 struct State{
@@ -475,18 +524,18 @@ impl State{
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Config{
     project: Project,
     settings: Settings,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Project{
     name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Settings{
     buffer_length: usize,
     project_samplerate: usize,

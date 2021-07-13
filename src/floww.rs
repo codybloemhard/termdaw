@@ -59,10 +59,9 @@ impl FlowwBank{
         }
     }
 
-    pub fn set_time(&mut self, t: f32){
-        let t_frame = (t * self.sr as f32).round() as usize;
-        self.set_start_indices_to_frame(t_frame, false);
-        self.frame = t_frame;
+    pub fn set_time(&mut self, t: usize){
+        self.set_start_indices_to_frame(t, false);
+        self.frame = t;
     }
 
     pub fn set_time_to_next_block(&mut self){

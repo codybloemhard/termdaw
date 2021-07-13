@@ -109,9 +109,21 @@ impl Graph{
     }
 
     pub fn set_time(&mut self, time: usize){
+        self.t = time;
         for v in &mut self.vertices{
             v.set_time(time);
         }
+    }
+
+    pub fn change_time(&mut self, delta: usize, plus: bool) -> usize{
+        let new_time = if plus { self.t + delta }
+        else { self.t - delta.min(self.t) };
+        self.set_time(new_time);
+        new_time
+    }
+
+    pub fn get_time(&self) -> usize{
+        self.t
     }
 
     pub fn set_output(&mut self, vert: &str) -> bool{
@@ -168,14 +180,14 @@ impl Graph{
     pub fn scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
-        fb.set_time(0.0);
+        fb.set_time(0);
         for j in 0..chunks {
             self.reset_ran_stati();
             self.run_vertex(j * self.max_buffer_len, sb, fb, host, i, true);
             fb.set_time_to_next_block();
         }
         self.set_time(0);
-        fb.set_time(0.0);
+        fb.set_time(0);
     }
 }
 
