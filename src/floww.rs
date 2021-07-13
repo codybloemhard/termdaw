@@ -1,7 +1,7 @@
 use std::collections::{ HashMap };
 
 use apres::{ MIDI };
-use apres::MIDIEvent::{ NoteOn, NoteOff };
+use apres::MIDIEvent::{ NoteOn, NoteOff, SetTempo };
 
 #[derive(Default)]
 pub struct FlowwBank{
@@ -131,16 +131,21 @@ pub type Floww = Vec<Point>;
 
 pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
     let ppqn = midi.get_ppqn() as f32;
+    let mut time_mult = 1.0; // 60bpm per default
     let mut floww = Vec::new();
     for track in midi.get_tracks(){
-        let mut time = 0;
+        let mut time = 0.0;
         for (tick, id) in track{
-            time += tick;
-            if let Some(NoteOn(_, note, vel)) = midi.get_event(id) {
-                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, vel as f32 / 127.0));
+            time += tick as f32 / ppqn * time_mult * sr as f32;
+            let ev = midi.get_event(id);
+            if let Some(NoteOn(_, note, vel)) = ev {
+                floww.push((time as usize, note as usize, note as f32, vel as f32 / 127.0));
             }
-            if let Some(NoteOff(_, note, _)) = midi.get_event(id){
-                floww.push(((time as f32 / ppqn * sr as f32) as usize, note as usize, note as f32, 0.0));
+            else if let Some(NoteOff(_, note, _)) = ev {
+                floww.push((time as usize, note as usize, note as f32, 0.0));
+            }
+            else if let Some(SetTempo(t)) = ev {
+                time_mult = t as f32 / 1_000_000.0;
             }
         }
     }
