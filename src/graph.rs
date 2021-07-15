@@ -1,5 +1,7 @@
 use crate::sample::{ Sample, SampleBank };
 use crate::floww::{ FlowwBank };
+use crate::adsr::*;
+
 use lv2hm::Lv2Host;
 
 use std::collections::{ HashMap, VecDeque };
@@ -268,7 +270,15 @@ pub enum VertexExt{
     },
     Lv2fx{
         index: usize,
-    }
+    },
+    Adsr{
+        use_off: bool,
+        conf: AdsrConf,
+        floww_index: usize,
+        t: f32,
+        vel: f32,
+        ads: bool,
+    },
 }
 
 impl VertexExt{
@@ -326,6 +336,17 @@ impl VertexExt{
         }
     }
 
+    pub fn adsr(use_off: bool, conf: AdsrConf, floww_index: usize) -> Self{
+        Self::Adsr{
+            use_off,
+            conf,
+            floww_index,
+            t: 0.0,
+            vel: conf.std_vel,
+            ads: true,
+        }
+    }
+
     fn set_time(&mut self, time: usize){
         if let Self::SampleLoop{ t, .. } = self { *t = time; }
     }
@@ -353,6 +374,9 @@ impl VertexExt{
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
             },
+            Self::Adsr { use_off, conf, floww_index, t, vel, ads } => {
+                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, &conf, t, vel, ads);
+            }
         }
         buf.apply_angle(angle, len);
         buf.apply_gain(gain, len);
@@ -367,6 +391,7 @@ impl VertexExt{
             Self::SampleFlowwLerp { .. } => false,
             Self::SineFloww { .. } => false,
             Self::Lv2fx { .. } => true,
+            Self::Adsr { .. } => true,
          }
     }
 }
@@ -529,3 +554,35 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host
     }
 }
 
+fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank, use_off: bool, floww_index: usize, sr: usize, conf: &AdsrConf, t: &mut f32, vel: &mut f32, ads: &mut bool){
+    sum_inputs(buf, len, res);
+    fb.start_block(floww_index);
+    if use_off{
+        for i in 0..len{
+            for (on, note, vel) in fb.get_block_simple(floww_index, i){
+                if on{
+                    *t = 0.0;
+                    *ads = true;
+                } else {
+                    *ads = false;
+                }
+            }
+            *vel = if *ads{
+                apply_ads(conf, *t)
+            } else {
+                apply_r(conf, *t)
+            };
+            buf.l[i] *= *vel;
+            buf.r[i] *= *vel;
+        }
+    } else {
+        for i in 0..len{
+            if let Some((note, vel)) = fb.get_block_drum(floww_index, i){
+                *t = 0.0;
+            }
+            *vel = vel.max(apply_adsr(conf, *t));
+            buf.l[i] *= *vel;
+            buf.r[i] *= *vel;
+        }
+    }
+}

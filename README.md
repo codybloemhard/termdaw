@@ -46,7 +46,6 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Floww/Midi pipeline
 - [ ] Mono support
 - [ ] Lv2 midi instrument vertex
-- [ ] Envelope vertex
 - [ ] Lufs mastering tool
 - [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes

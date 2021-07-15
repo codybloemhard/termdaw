@@ -15,9 +15,11 @@ use term_basics_linux as tbl;
 mod sample;
 mod graph;
 mod floww;
+mod adsr;
 use sample::*;
 use graph::*;
 use floww::*;
+use adsr::*;
 
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
