@@ -275,9 +275,9 @@ pub enum VertexExt{
         use_off: bool,
         conf: AdsrConf,
         floww_index: usize,
-        t: f32,
-        vel: f32,
-        ads: bool,
+        note: Option<usize>,
+        primary: (f32, f32, bool),
+        ghost: (f32, f32, bool),
     },
 }
 
@@ -336,14 +336,14 @@ impl VertexExt{
         }
     }
 
-    pub fn adsr(use_off: bool, conf: AdsrConf, floww_index: usize) -> Self{
+    pub fn adsr(use_off: bool, conf: AdsrConf, note: Option<usize>, floww_index: usize) -> Self{
         Self::Adsr{
             use_off,
             conf,
+            note,
             floww_index,
-            t: 0.0,
-            vel: conf.std_vel,
-            ads: true,
+            primary: (0.0, 0.0, true),
+            ghost: (0.0, 0.0, true),
         }
     }
 
@@ -374,8 +374,8 @@ impl VertexExt{
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
             },
-            Self::Adsr { use_off, conf, floww_index, t, vel, ads } => {
-                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, &conf, t, vel, ads);
+            Self::Adsr { use_off, conf, note, floww_index, primary, ghost } => {
+                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, &conf, *note, primary, ghost);
             }
         }
         buf.apply_angle(angle, len);
@@ -554,35 +554,52 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host
     }
 }
 
-fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank, use_off: bool, floww_index: usize, sr: usize, conf: &AdsrConf, t: &mut f32, vel: &mut f32, ads: &mut bool){
+fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank, use_off: bool, floww_index: usize, sr: usize,
+            conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, bool), ghost: &mut (f32, f32, bool)){
     sum_inputs(buf, len, res);
     fb.start_block(floww_index);
     if use_off{
         for i in 0..len{
-            for (on, note, vel) in fb.get_block_simple(floww_index, i){
+            for (on, n, v) in fb.get_block_simple(floww_index, i){
+                if let Some(target) = note{
+                    if (target as f32 - n).abs() > 0.01 { continue; }
+                }
                 if on{
-                    *t = 0.0;
-                    *ads = true;
+                    *ghost = *primary;
+                    *primary = (0.0, v, true);
+                } else if ghost.2 {
+                    ghost.2 = false;
                 } else {
-                    *ads = false;
+                    primary.2 = false;
                 }
             }
-            *vel = if *ads{
-                apply_ads(conf, *t)
-            } else {
-                apply_r(conf, *t)
-            };
-            buf.l[i] *= *vel;
-            buf.r[i] *= *vel;
+            let pvel = if primary.2{ apply_ads(conf, primary.0) * primary.1 }
+            else { apply_r(conf, primary.0) * primary.1 };
+            let gvel = if ghost.2{ apply_ads(conf, ghost.0) * ghost.1 }
+            else { apply_r(conf, ghost.0) * ghost.1 };
+            let vel = pvel.max(gvel);
+
+            buf.l[i] *= vel;
+            buf.r[i] *= vel;
         }
     } else {
         for i in 0..len{
-            if let Some((note, vel)) = fb.get_block_drum(floww_index, i){
-                *t = 0.0;
+            if let Some((n, v)) = fb.get_block_drum(floww_index, i){
+                if let Some(target) = note{
+                    if (target as f32 - n).abs() > 0.01 { continue; }
+                }
+                *ghost = *primary;
+                *primary = (0.0, v, true);
             }
-            *vel = vel.max(apply_adsr(conf, *t));
-            buf.l[i] *= *vel;
-            buf.r[i] *= *vel;
+            let offset = i as f32 / sr as f32;
+            let pvel = apply_adsr(conf, primary.0 + offset);
+            let gvel = apply_adsr(conf, ghost.0 + offset);
+            let vel = pvel.max(gvel);
+
+            buf.l[i] *= vel;
+            buf.r[i] *= vel;
         }
     }
+    primary.0 += len as f32 / sr as f32;
+    ghost.0 += len as f32 / sr as f32;
 }

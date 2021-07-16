@@ -12,17 +12,15 @@ load_midi_floww("snare", "/home/cody/git/music-gen/snare.midi");
 load_midi_floww("test", "/home/cody/git/music-gen/comping0.midi");
 -- load_lv2("compressor", "http://calf.sourceforge.net/plugins/Compressor");
 
-add_samplefloww_lerp("one", 1.0, 0.0, "snare", "snare", -1, 40);
-add_samplefloww_lerp("two", 1.0, 0.0, "kick", "bassd", -1, 40);
-add_sinefloww("three", 0.2, 0.0, "test");
--- add_sampleloop("one", 1.0, 0.0, "snare");
--- add_sampleloop("two", 1.0, 0.0, "kick");
+add_samplefloww_lerp("kick", 1.0, 0.0, "kick", "bassd", -1, 40);
+add_samplefloww_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
+add_sinefloww("comp", 0.2, 0.0, "test");
+add_adsr("env", 1.0, 0.0, "snare", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
 add_normalize("sum", 1.0, 0.0);
--- add_lv2fx("effect", 1.0, 0.0, "compressor");
 
-connect("one", "sum");
--- connect("crush", "sum");
-connect("two", "sum");
-connect("three", "sum");
+connect("kick", "env");
+connect("env", "sum");
+connect("snare", "sum");
+--connect("comp", "sum");
 
 set_output("sum");

@@ -253,6 +253,8 @@ impl State{
         let mut sampleflowwslerp = Vec::new();
         let mut sineflowws = Vec::new();
         let mut lv2fxs = Vec::new();
+        let mut adsrs = Vec::new();
+
         let mut edges = Vec::new();
 
         let mut cs = self.cs;
@@ -334,6 +336,11 @@ impl State{
             // add_lv2fx(name, gain, angle, plugin)
             self.lua.globals().set("add_lv2fx", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
                 lv2fxs.push(seed);
+                Ok(())
+            })?)?;
+            // add_adsr(name, gain, angle, floww, use_off, note, conf)
+            self.lua.globals().set("add_adsr", scope.create_function_mut(|_, seed: (String, f32, f32, String, bool, i32, Vec<f32>)| {
+                adsrs.push(seed);
                 Ok(())
             })?)?;
             // connect(name, name)
@@ -434,6 +441,30 @@ impl State{
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sine_floww(floww)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
+        for (name, gain, angle, floww, use_off, note, conf) in &adsrs {
+            let floww = self.fb.get_index(&floww).unwrap();
+            let note = if note < &0 { None }
+            else { Some(*note as usize) };
+            let conf = if conf.len() == 6 {
+                hit_adsr_conf(conf[0], conf[1], conf[2], conf[3], conf[4], conf[5])
+            } else if conf.len() == 9 {
+                AdsrConf{
+                    std_vel: conf[0],
+                    attack_ms: conf[1],
+                    attack_vel: conf[2],
+                    decay_ms: conf[3],
+                    decay_vel: conf[4],
+                    sustain_ms: conf[5],
+                    sustain_vel: conf[6],
+                    release_ms: conf[7],
+                    release_vel: conf[8],
+                }
+            } else {
+                panic!("ADSR config must have 6 or 9 elements");
+            };
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::adsr(*use_off, conf, note, floww)), name.to_owned());
+        }
+
         for (a, b) in &edges { self.g.connect(a, b); }
 
         self.g.set_output(&self.output_vertex);
