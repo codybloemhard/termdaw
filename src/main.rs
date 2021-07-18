@@ -450,13 +450,13 @@ impl State{
             } else if conf.len() == 9 {
                 AdsrConf{
                     std_vel: conf[0],
-                    attack_ms: conf[1],
+                    attack_sec: conf[1],
                     attack_vel: conf[2],
-                    decay_ms: conf[3],
+                    decay_sec: conf[3],
                     decay_vel: conf[4],
-                    sustain_ms: conf[5],
+                    sustain_sec: conf[5],
                     sustain_vel: conf[6],
-                    release_ms: conf[7],
+                    release_sec: conf[7],
                     release_vel: conf[8],
                 }
             } else {

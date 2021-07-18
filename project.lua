@@ -15,7 +15,7 @@ load_midi_floww("test", "/home/cody/git/music-gen/comping0.midi");
 add_samplefloww_lerp("kick", 1.0, 0.0, "kick", "bassd", -1, 40);
 add_samplefloww_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
 add_sinefloww("comp", 0.2, 0.0, "test");
-add_adsr("env", 1.0, 0.0, "snare", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
+add_adsr("env", 1.0, 0.0, "bassd", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
 add_normalize("sum", 1.0, 0.0);
 
 connect("kick", "env");
