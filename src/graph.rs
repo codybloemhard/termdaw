@@ -568,15 +568,18 @@ fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank,
                     *ghost = *primary;
                     *primary = (-(i as f32 / sr as f32), v, true);
                 } else if ghost.2 {
+                    ghost.0 = -(i as f32 / sr as f32);
                     ghost.2 = false;
                 } else {
+                    primary.0 = -(i as f32 / sr as f32);
                     primary.2 = false;
                 }
             }
-            let pvel = if primary.2{ apply_ads(conf, primary.0) * primary.1 }
-            else { apply_r(conf, primary.0) * primary.1 };
-            let gvel = if ghost.2{ apply_ads(conf, ghost.0) * ghost.1 }
-            else { apply_r(conf, ghost.0) * ghost.1 };
+            let offset = i as f32 / sr as f32;
+            let pvel = if primary.2 { apply_ads(conf, primary.0 + offset) * primary.1 }
+            else { apply_r(conf, primary.0 + offset) * primary.1 };
+            let gvel = if ghost.2 { apply_ads(conf, ghost.0 + offset) * ghost.1 }
+            else { apply_r(conf, ghost.0 + offset) * ghost.1 };
             let vel = pvel.max(gvel);
 
             buf.l[i] *= vel;
