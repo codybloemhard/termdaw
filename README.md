@@ -26,7 +26,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sum vertex
   - [x] Normalize vertex
   - [x] Sample loop vertex
-  - [ ] Envelope vertex
+  - [x] Envelope vertex
   - [x] Sample multi vertex
   - [x] Sample lerp vertex
   - [x] Lv2 fx vertex

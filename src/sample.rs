@@ -1,6 +1,6 @@
-use std::collections::{ HashMap, HashSet };
-
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
+
+use std::collections::{ HashMap, HashSet };
 
 #[derive(Clone)]
 pub struct Sample{

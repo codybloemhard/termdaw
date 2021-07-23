@@ -1,7 +1,7 @@
-use std::collections::{ HashMap };
-
 use apres::{ MIDI };
 use apres::MIDIEvent::{ NoteOn, NoteOff, SetTempo };
+
+use std::collections::{ HashMap };
 
 #[derive(Default)]
 pub struct FlowwBank{

@@ -16,10 +16,13 @@ mod sample;
 mod graph;
 mod floww;
 mod adsr;
+mod extensions;
+
 use sample::*;
 use graph::*;
 use floww::*;
 use adsr::*;
+use extensions::*;
 
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
