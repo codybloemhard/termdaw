@@ -16,13 +16,13 @@ pub enum VertexExt{
         sample_index: usize,
         t: usize,
     },
-    SampleFlowwMulti{
+    SampleMulti{
         sample_index: usize,
         floww_index: usize,
         note: Option<usize>,
         ts: VecDeque<(i64, f32)>,
     },
-    SampleFlowwLerp{
+    SampleLerp{
         sample_index: usize,
         floww_index: usize,
         note: Option<usize>,
@@ -31,7 +31,7 @@ pub enum VertexExt{
         primary: (i64, f32),
         ghost: (i64, f32),
     },
-    SineFloww{
+    DebugSine{
         floww_index: usize,
         notes: Vec<(f32, f32)>,
     },
@@ -66,8 +66,8 @@ impl VertexExt{
         }
     }
 
-    pub fn sample_floww_multi(sample_index: usize, floww_index: usize, note: Option<usize>) -> Self{
-        Self::SampleFlowwMulti{
+    pub fn sample_multi(sample_index: usize, floww_index: usize, note: Option<usize>) -> Self{
+        Self::SampleMulti{
             sample_index,
             floww_index,
             ts: VecDeque::new(),
@@ -75,8 +75,8 @@ impl VertexExt{
         }
     }
 
-    pub fn sample_floww_lerp(sample_index: usize, floww_index: usize, note: Option<usize>, lerp_len: usize) -> Self{
-        Self::SampleFlowwLerp{
+    pub fn sample_lerp(sample_index: usize, floww_index: usize, note: Option<usize>, lerp_len: usize) -> Self{
+        Self::SampleLerp{
             sample_index,
             floww_index,
             note,
@@ -87,8 +87,8 @@ impl VertexExt{
         }
     }
 
-    pub fn sine_floww(floww_index: usize) -> Self{
-        Self::SineFloww{
+    pub fn debug_sine(floww_index: usize) -> Self{
+        Self::DebugSine{
             floww_index,
             notes: Vec::new(),
         }
@@ -126,14 +126,14 @@ impl VertexExt{
             Self::SampleLoop { t, sample_index } => {
                 sample_loop_gen(buf, sb, len, t, *sample_index);
             },
-            Self::SampleFlowwMulti { ts, sample_index, floww_index, note } => {
-                sample_floww_multi_gen(buf, sb, fb, len, ts, *sample_index, *floww_index, *note);
+            Self::SampleMulti { ts, sample_index, floww_index, note } => {
+                sample_multi_gen(buf, sb, fb, len, ts, *sample_index, *floww_index, *note);
             },
-            Self::SampleFlowwLerp { sample_index, floww_index, note, countdown, lerp_len, primary, ghost } => {
-                sample_floww_lerp_gen(buf, sb, fb, len, *sample_index, *floww_index, *note, *lerp_len, countdown, primary, ghost);
+            Self::SampleLerp { sample_index, floww_index, note, countdown, lerp_len, primary, ghost } => {
+                sample_lerp_gen(buf, sb, fb, len, *sample_index, *floww_index, *note, *lerp_len, countdown, primary, ghost);
             },
-            Self::SineFloww { floww_index, notes } => {
-                sine_floww_gen(buf, fb, len, *floww_index, notes, t, sr);
+            Self::DebugSine { floww_index, notes } => {
+                debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -151,9 +151,9 @@ impl VertexExt{
             Self::Sum => true,
             Self::Normalize { .. } => true,
             Self::SampleLoop { .. } => false,
-            Self::SampleFlowwMulti { .. } => false,
-            Self::SampleFlowwLerp { .. } => false,
-            Self::SineFloww { .. } => false,
+            Self::SampleMulti { .. } => false,
+            Self::SampleLerp { .. } => false,
+            Self::DebugSine { .. } => false,
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
          }
@@ -194,7 +194,7 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize,
     *t += len;
 }
 
-fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize, target_note: Option<usize>){
+fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize, target_note: Option<usize>){
     let sample = sb.get_sample(sample_index);
     fb.start_block(floww_index);
     for i in 0..len{
@@ -228,7 +228,7 @@ fn sample_floww_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank,
     }
 }
 
-fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, sample_index: usize,
+fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, sample_index: usize,
     floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
     let sample = sb.get_sample(sample_index);
     fb.start_block(floww_index);
@@ -263,7 +263,7 @@ fn sample_floww_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, 
     ghost.0 += len as i64;
 }
 
-fn sine_floww_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
+fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){

@@ -30,6 +30,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sample multi vertex
   - [x] Sample lerp vertex
   - [x] Lv2 fx vertex
+  - [x] Debug Sine synth vertex
   - [ ] Simple synth vertex
   - [ ] Wavetable synth vertex
 - Floww
@@ -41,10 +42,15 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Refreshable: remove old, add new, keep same
 
 ## Goals for later
+- [ ] Multitype graph
+  - [ ] In/Out ports
+  - [ ] Type checker
+  - [ ] Stereo type
+  - [ ] Mono type
+  - [ ] Floww type
+  - [ ] Value type
+- [ ] Value automation
 - [ ] Bound normalization
-- [ ] Automation
-- [ ] Floww/Midi pipeline
-- [ ] Mono support
 - [ ] Lv2 midi instrument vertex
 - [ ] Lufs mastering tool
 - [ ] Read floww from floww description

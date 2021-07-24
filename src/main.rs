@@ -244,21 +244,20 @@ impl State{
         self.contents.clear();
         file.read_to_string(&mut self.contents).unwrap();
 
-        let mut new_samples = Vec::new();
-        let mut new_lv2plugins = Vec::new();
-        let mut new_lv2params = Vec::new();
-        let mut midis = Vec::new();
-
-        let mut sums = Vec::new();
-        let mut norms = Vec::new();
-        let mut sampleloops = Vec::new();
-        let mut sampleflowwsmulti = Vec::new();
-        let mut sampleflowwslerp = Vec::new();
-        let mut sineflowws = Vec::new();
-        let mut lv2fxs = Vec::new();
-        let mut adsrs = Vec::new();
-
-        let mut edges = Vec::new();
+        macro_rules! init_vecs{
+            ($x:ident) => (
+                let mut $x = Vec::new();
+            );
+            ($x:ident, $($y:ident),+) => (
+                let mut $x = Vec::new();
+                init_vecs!($($y),+);
+            );
+        }
+        init_vecs!(
+            new_samples, new_lv2plugins, new_lv2params, midis,
+            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, lv2fxs, adsrs,
+            edges
+        );
 
         let mut cs = self.cs;
         let mut render_sr = self.render_sr;
@@ -267,90 +266,60 @@ impl State{
         let mut output_vertex = std::mem::take(&mut self.output_vertex);
 
         self.lua.scope(|scope| {
+            // ---- Macros
+            macro_rules! seed{
+                ($name:expr, $stype:ty, $vec:ident) => {
+                    self.lua.globals().set($name, scope.create_function_mut(|_, seed: $stype| {
+                        $vec.push(seed);
+                        Ok(())
+                    })?)?;
+                };
+            }
+            macro_rules! setter{
+                ($name:expr, $stype:ty, $var:ident) => {
+                    self.lua.globals().set($name, scope.create_function_mut(|_, arg: $stype| {
+                        $var = arg;
+                        Ok(())
+                    })?)?;
+                };
+            }
             // ---- Settings
             self.lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
                 cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
                 Ok(())
             })?)?;
-            self.lua.globals().set("set_render_samplerate", scope.create_function_mut(|_, new_sr: usize| {
-                render_sr = new_sr;
-                Ok(())
-            })?)?;
-            self.lua.globals().set("set_render_bitdepth", scope.create_function_mut(|_, new_bd: usize| {
-                bd = new_bd;
-                Ok(())
-            })?)?;
-            self.lua.globals().set("set_output_file", scope.create_function_mut(|_, out: String| {
-                output_file = out;
-                Ok(())
-            })?)?;
+            setter!("set_render_samplerate", usize, render_sr);
+            setter!("set_render_bitdepth", usize, bd);
+            setter!("set_output_file", String, output_file);
             // ---- Resources
-            // load_sample(name, file)
-            self.lua.globals().set("load_sample", scope.create_function_mut(|_, seed: (String, String)| {
-                new_samples.push(seed);
-                Ok(())
-            })?)?;
-            // load_midi(name, file)
-            self.lua.globals().set("load_midi_floww", scope.create_function_mut(|_, seed: (String, String)| {
-                midis.push(seed);
-                Ok(())
-            })?)?;
-            // load_lv2(name, uri)
-            self.lua.globals().set("load_lv2", scope.create_function_mut(|_, seed: (String, String)| {
-                new_lv2plugins.push(seed);
-                Ok(())
-            })?)?;
-            // parameter(plugin, name, value)
-            self.lua.globals().set("parameter", scope.create_function_mut(|_, seed: (String, String, f32)| {
-                new_lv2params.push(seed);
-                Ok(())
-            })?)?;
+                // load_sample(name, file)
+            seed!("load_sample", (String, String), new_samples);
+                // load_midi(name, file)
+            seed!("load_midi_floww", (String, String), midis);
+                // load_lv2(name, uri)
+            seed!("load_lv2", (String, String), new_lv2plugins);
+                // parameter(plugin, name, value)
+            seed!("parameter", (String, String, f32), new_lv2params);
             // ---- Graph
-            // add_sum(name, gain, angle)
-            self.lua.globals().set("add_sum", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-                sums.push(seed);
-                Ok(())
-            })?)?;
-            // add_normalize(name, gain, angle)
-            self.lua.globals().set("add_normalize", scope.create_function_mut(|_, seed: (String, f32, f32)| {
-                norms.push(seed);
-                Ok(())
-            })?)?;
-            // add_sampleloop(name, gain, angle, sample)
-            self.lua.globals().set("add_sampleloop", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-                sampleloops.push(seed);
-                Ok(())
-            })?)?;
-            // add_samplefloww(name, gain, angle, sample, floww, note)
-            self.lua.globals().set("add_samplefloww_multi", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32)| {
-                sampleflowwsmulti.push(seed);
-                Ok(())
-            })?)?;
-            // add_samplefloww(name, gain, angle, sample, floww, note, lerp_len)
-            self.lua.globals().set("add_samplefloww_lerp", scope.create_function_mut(|_, seed: (String, f32, f32, String, String, i32, i32)| {
-                sampleflowwslerp.push(seed);
-                Ok(())
-            })?)?;
-            // add_sinefloww(name, gain, angle, floww)
-            self.lua.globals().set("add_sinefloww", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-                sineflowws.push(seed);
-                Ok(())
-            })?)?;
-            // add_lv2fx(name, gain, angle, plugin)
-            self.lua.globals().set("add_lv2fx", scope.create_function_mut(|_, seed: (String, f32, f32, String)| {
-                lv2fxs.push(seed);
-                Ok(())
-            })?)?;
-            // add_adsr(name, gain, angle, floww, use_off, note, conf)
-            self.lua.globals().set("add_adsr", scope.create_function_mut(|_, seed: (String, f32, f32, String, bool, i32, Vec<f32>)| {
-                adsrs.push(seed);
-                Ok(())
-            })?)?;
-            // connect(name, name)
-            self.lua.globals().set("connect", scope.create_function_mut(|_, seed: (String, String)| {
-                edges.push(seed);
-                Ok(())
-            })?)?;
+                // add_sum(name, gain, angle)
+            seed!("add_sum", (String, f32, f32), sums);
+                // add_normalize(name, gain, angle)
+            seed!("add_normalize", (String, f32, f32), norms);
+                // add_sampleloop(name, gain, angle, sample)
+            seed!("add_sampleloop", (String, f32, f32, String), sampleloops);
+                // add_sample_multi(name, gain, angle, sample, floww, note)
+            seed!("add_sample_multi", (String, f32, f32, String, String, i32), samplemultis);
+                // add_sample_lerp(name, gain, angle, sample, floww, note, lerp_len)
+            seed!("add_sample_lerp", (String, f32, f32, String, String, i32, i32), samplelerps);
+                // add_debug_sine(name, gain, angle, floww)
+            seed!("add_debug_sine", (String, f32, f32, String), debugsines);
+                // add_lv2fx(name, gain, angle, plugin)
+            seed!("add_lv2fx", (String, f32, f32, String), lv2fxs);
+                // add_adsr(name, gain, angle, floww, use_off, note, conf)
+            seed!("add_adsr", (String, f32, f32, String, bool, i32, Vec<f32>), adsrs);
+                // connect(name, name)
+            seed!("connect", (String, String), edges);
+            // ---- Output
             self.lua.globals().set("set_output", scope.create_function_mut(|_, out: String| {
                 output_vertex = out;
                 Ok(())
@@ -424,24 +393,24 @@ impl State{
         for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(&sample).unwrap())), name.to_owned()); }
-        for (name, gain, angle, sample, floww, note) in &sampleflowwsmulti {
+        for (name, gain, angle, sample, floww, note) in &samplemultis {
             let sample = self.sb.get_index(&sample).unwrap();
             let floww = self.fb.get_index(&floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww_multi(sample, floww, note)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
         }
-        for (name, gain, angle, sample, floww, note, lerp_len) in &sampleflowwslerp {
+        for (name, gain, angle, sample, floww, note, lerp_len) in &samplelerps {
             let sample = self.sb.get_index(&sample).unwrap();
             let floww = self.fb.get_index(&floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let lerp_len = (*lerp_len).max(0) as usize;
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_floww_lerp(sample, floww, note, lerp_len)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
         }
-        for (name, gain, angle, floww) in &sineflowws {
+        for (name, gain, angle, floww) in &debugsines {
             let floww = self.fb.get_index(&floww).unwrap();
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sine_floww(floww)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::debug_sine(floww)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (name, gain, angle, floww, use_off, note, conf) in &adsrs {
