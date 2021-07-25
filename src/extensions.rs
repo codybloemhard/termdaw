@@ -35,6 +35,10 @@ pub enum VertexExt{
         floww_index: usize,
         notes: Vec<(f32, f32)>,
     },
+    Synth{
+        floww_index: usize,
+        notes: Vec<(f32, f32)>,
+    },
     Lv2fx{
         index: usize,
     },
@@ -94,6 +98,13 @@ impl VertexExt{
         }
     }
 
+    pub fn synth(floww_index: usize) -> Self{
+        Self::Synth{
+            floww_index,
+            notes: Vec::new(),
+        }
+    }
+
     pub fn lv2fx(plugin_index: usize) -> Self{
         Self::Lv2fx{
             index: plugin_index,
@@ -135,6 +146,9 @@ impl VertexExt{
             Self::DebugSine { floww_index, notes } => {
                 debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
+            Self::Synth { floww_index, notes } => {
+                synth_gen(buf, fb, len, *floww_index, notes, t, sr);
+            }
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
             },
@@ -154,6 +168,7 @@ impl VertexExt{
             Self::SampleMulti { .. } => false,
             Self::SampleLerp { .. } => false,
             Self::DebugSine { .. } => false,
+            Self::Synth { .. } => false,
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
          }
@@ -264,6 +279,39 @@ fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: u
 }
 
 fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
+    fb.start_block(floww_index);
+    for i in 0..len{
+        for (on, note, vel) in fb.get_block_simple(floww_index, i){
+            if on{
+                let mut has = false;
+                for (n, v) in notes.iter_mut(){
+                    if (*n - note).abs() < 0.001{
+                        *v = vel;
+                        has = true;
+                        break;
+                    }
+                }
+                if !has {
+                    notes.push((note, vel));
+                }
+            } else {
+                notes.retain(|x| (x.0 - note).abs() > 0.001);
+            }
+        }
+
+        buf.l[i] = 0.0;
+        buf.r[i] = 0.0;
+        for (note, vel) in notes.iter(){
+            let time = (t + i) as f32 / sr as f32;
+            let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
+            let s = (time * hz * 2.0 * PI).sin() * vel;
+            buf.l[i] += s;
+            buf.r[i] += s;
+        }
+    }
+}
+
+fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){

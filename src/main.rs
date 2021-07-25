@@ -255,7 +255,7 @@ impl State{
         }
         init_vecs!(
             new_samples, new_lv2plugins, new_lv2params, midis,
-            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, lv2fxs, adsrs,
+            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, lv2fxs, adsrs,
             edges
         );
 
@@ -313,6 +313,8 @@ impl State{
             seed!("add_sample_lerp", (String, f32, f32, String, String, i32, i32), samplelerps);
                 // add_debug_sine(name, gain, angle, floww)
             seed!("add_debug_sine", (String, f32, f32, String), debugsines);
+                // add_synth(name, gain, angle, floww)
+            seed!("add_synth", (String, f32, f32, String), synths);
                 // add_lv2fx(name, gain, angle, plugin)
             seed!("add_lv2fx", (String, f32, f32, String), lv2fxs);
                 // add_adsr(name, gain, angle, floww, use_off, note, conf)
@@ -411,6 +413,10 @@ impl State{
         for (name, gain, angle, floww) in &debugsines {
             let floww = self.fb.get_index(&floww).unwrap();
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::debug_sine(floww)), name.to_owned());
+        }
+        for (name, gain, angle, floww) in &synths {
+            let floww = self.fb.get_index(&floww).unwrap();
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::synth(floww)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (name, gain, angle, floww, use_off, note, conf) in &adsrs {
