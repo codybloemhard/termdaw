@@ -11,6 +11,7 @@ use skim::prelude::*;
 use sdl2::audio::AudioSpecDesired;
 use lv2hm::Lv2Host;
 use term_basics_linux as tbl;
+use fnrs::{ vecs };
 
 mod sample;
 mod graph;
@@ -244,16 +245,7 @@ impl State{
         self.contents.clear();
         file.read_to_string(&mut self.contents).unwrap();
 
-        macro_rules! init_vecs{
-            ($x:ident) => (
-                let mut $x = Vec::new();
-            );
-            ($x:ident, $($y:ident),+) => (
-                let mut $x = Vec::new();
-                init_vecs!($($y),+);
-            );
-        }
-        init_vecs!(
+        vecs!(
             new_samples, new_lv2plugins, new_lv2params, midis,
             sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, lv2fxs, adsrs,
             edges
