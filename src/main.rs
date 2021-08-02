@@ -305,11 +305,11 @@ impl State{
             seed!("add_sample_lerp", (String, f32, f32, String, String, i32, i32), samplelerps);
                 // add_debug_sine(name, gain, angle, floww)
             seed!("add_debug_sine", (String, f32, f32, String), debugsines);
-                // add_synth(name, gain, angle, floww)
-            seed!("add_synth", (String, f32, f32, String), synths);
+                // add_synth(name, gain, angle, floww, adsr_conf)
+            seed!("add_synth", (String, f32, f32, String, Vec<f32>), synths);
                 // add_lv2fx(name, gain, angle, plugin)
             seed!("add_lv2fx", (String, f32, f32, String), lv2fxs);
-                // add_adsr(name, gain, angle, floww, use_off, note, conf)
+                // add_adsr(name, gain, angle, floww, use_off, note, adsr_conf)
             seed!("add_adsr", (String, f32, f32, String, bool, i32, Vec<f32>), adsrs);
                 // connect(name, name)
             seed!("connect", (String, String), edges);
@@ -406,29 +406,22 @@ impl State{
             let floww = self.fb.get_index(&floww).unwrap();
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::debug_sine(floww)), name.to_owned());
         }
-        for (name, gain, angle, floww) in &synths {
+        for (name, gain, angle, floww, conf_arr) in &synths {
             let floww = self.fb.get_index(&floww).unwrap();
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::synth(floww)), name.to_owned());
+            let conf = if let Some(config) = build_adsr_conf(&conf_arr){
+                config
+            } else {
+                panic!("ADSR config must have 6 or 9 elements");
+            };
+            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::synth(floww, conf)), name.to_owned());
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
-        for (name, gain, angle, floww, use_off, note, conf) in &adsrs {
+        for (name, gain, angle, floww, use_off, note, conf_arr) in &adsrs {
             let floww = self.fb.get_index(&floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
-            let conf = if conf.len() == 6 {
-                hit_adsr_conf(conf[0], conf[1], conf[2], conf[3], conf[4], conf[5])
-            } else if conf.len() == 9 {
-                AdsrConf{
-                    std_vel: conf[0],
-                    attack_sec: conf[1],
-                    attack_vel: conf[2],
-                    decay_sec: conf[3],
-                    decay_vel: conf[4],
-                    sustain_sec: conf[5],
-                    sustain_vel: conf[6],
-                    release_sec: conf[7],
-                    release_vel: conf[8],
-                }
+            let conf = if let Some(config) = build_adsr_conf(&conf_arr){
+                config
             } else {
                 panic!("ADSR config must have 6 or 9 elements");
             };

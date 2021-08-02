@@ -37,7 +37,8 @@ pub enum VertexExt{
     },
     Synth{
         floww_index: usize,
-        notes: Vec<(f32, f32)>,
+        notes: Vec<(f32, f32, f32, bool)>,
+        conf: AdsrConf,
     },
     Lv2fx{
         index: usize,
@@ -98,10 +99,11 @@ impl VertexExt{
         }
     }
 
-    pub fn synth(floww_index: usize) -> Self{
+    pub fn synth(floww_index: usize, conf: AdsrConf) -> Self{
         Self::Synth{
             floww_index,
             notes: Vec::new(),
+            conf,
         }
     }
 
@@ -146,8 +148,8 @@ impl VertexExt{
             Self::DebugSine { floww_index, notes } => {
                 debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
-            Self::Synth { floww_index, notes } => {
-                synth_gen(buf, fb, len, *floww_index, notes, t, sr);
+            Self::Synth { floww_index, notes, conf } => {
+                synth_gen(buf, fb, len, *floww_index, notes, &conf, t, sr);
             }
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -311,33 +313,47 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
     }
 }
 
-fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
+fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, bool)>, conf: &AdsrConf, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
             if on{
                 let mut has = false;
-                for (n, v) in notes.iter_mut(){
+                for (n, v, t, abs) in notes.iter_mut(){
                     if (*n - note).abs() < 0.001{
                         *v = vel;
+                        *t = -(i as f32 / sr as f32);
+                        *abs = true;
                         has = true;
                         break;
                     }
                 }
                 if !has {
-                    notes.push((note, vel));
+                    notes.push((note, vel, -(i as f32 / sr as f32), true));
                 }
             } else {
-                notes.retain(|x| (x.0 - note).abs() > 0.001);
+                notes.retain(|x| (x.0 - note).abs() > 0.001 || x.3);
+                for (n, _, t, abs) in notes.iter_mut(){
+                    if (*n - note).abs() > 0.001 { continue; }
+                    if *abs{
+                        *t = -(i as f32 / sr as f32);
+                        *abs = false;
+                    } else {
+                        panic!("Synth: impossible release stage note");
+                    }
+                }
             }
         }
 
         buf.l[i] = 0.0;
         buf.r[i] = 0.0;
-        for (note, vel) in notes.iter(){
+        for (note, vel, env_t, ads) in notes.iter(){
             let time = (t + i) as f32 / sr as f32;
+            let env_time = env_t + (i as f32 / sr as f32);
+            let env_vel = if *ads { apply_ads(conf, env_time) }
+            else { apply_r(conf, env_time) };
             let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
-            let s = (time * hz * 2.0 * PI).sin() * vel;
+            let s = (time * hz * 2.0 * PI).sin() * vel * env_vel;
             buf.l[i] += s;
             buf.r[i] += s;
         }

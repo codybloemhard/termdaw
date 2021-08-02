@@ -60,6 +60,26 @@ pub fn apply_adsr(conf: &AdsrConf, t: f32) -> f32{
     }
 }
 
+pub fn build_adsr_conf(arr: &[f32]) -> Option<AdsrConf>{
+    if arr.len() == 6 {
+        Some(hit_adsr_conf(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5]))
+    } else if arr.len() == 9 {
+        Some(AdsrConf{
+            std_vel: arr[0],
+            attack_sec: arr[1],
+            attack_vel: arr[2],
+            decay_sec: arr[3],
+            decay_vel: arr[4],
+            sustain_sec: arr[5],
+            sustain_vel: arr[6],
+            release_sec: arr[7],
+            release_vel: arr[8],
+        })
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests{
     use crate::adsr::*;
