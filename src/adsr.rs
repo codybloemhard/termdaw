@@ -47,8 +47,8 @@ pub fn apply_ads(conf: &AdsrConf, t: f32) -> f32{
     }
 }
 
-pub fn apply_r(conf: &AdsrConf, t: f32) -> f32{
-    conf.sustain_vel + (conf.release_vel - conf.sustain_vel) * (t / conf.release_sec).min(1.0)
+pub fn apply_r(conf: &AdsrConf, t: f32, old_val: f32) -> f32{
+    old_val + (conf.release_vel - old_val) * (t / conf.release_sec).min(1.0)
 }
 
 pub fn apply_adsr(conf: &AdsrConf, t: f32) -> f32{
@@ -84,7 +84,7 @@ pub fn build_adsr_conf(arr: &[f32]) -> Option<AdsrConf>{
 mod tests{
     use crate::adsr::*;
     #[test]
-    fn adsr_0(){
+    fn adsr_0(){ // adsr test
         let conf = hit_adsr_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
         assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
         assert!((0.5   - apply_adsr(&conf, 0.5)).abs() < 0.001);
@@ -99,7 +99,7 @@ mod tests{
     }
 
     #[test]
-    fn adsr_1(){
+    fn adsr_1(){ // ads+r test, going into release mode after sustain window
         let conf = hit_adsr_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
         assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
         assert!((0.5   - apply_ads(&conf, 0.5)).abs() < 0.001);
@@ -109,9 +109,24 @@ mod tests{
         assert!((0.375 - apply_ads(&conf, 2.5)).abs() < 0.001);
         assert!((0.25  - apply_ads(&conf, 3.0)).abs() < 0.001);
         assert!((0.25  - apply_ads(&conf, 7.0)).abs() < 0.001);
-        assert!((0.25  - apply_r(&conf, 0.0)).abs() < 0.001);
-        assert!((0.125 - apply_r(&conf, 0.5)).abs() < 0.001);
-        assert!((0.0   - apply_r(&conf, 1.0)).abs() < 0.001);
-        assert!((0.0   - apply_r(&conf, 9.0)).abs() < 0.001);
+        assert!((0.25  - apply_r(&conf, 0.0, 0.25)).abs() < 0.001);
+        assert!((0.125 - apply_r(&conf, 0.5, 0.25)).abs() < 0.001);
+        assert!((0.0   - apply_r(&conf, 1.0, 0.25)).abs() < 0.001);
+        assert!((0.0   - apply_r(&conf, 9.0, 0.25)).abs() < 0.001);
+    }
+
+    #[test]
+    fn adsr_2(){ // ads+r test, going into release mode in sustain window
+        let conf = hit_adsr_conf(1.0, 1.0, 0.5, 2.0, 0.25, 1.0);
+        assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
+        assert!((0.5    - apply_ads(&conf, 0.5)).abs() < 0.001);
+        assert!((1.0    - apply_ads(&conf, 1.0)).abs() < 0.001);
+        assert!((0.75   - apply_ads(&conf, 1.5)).abs() < 0.001);
+        assert!((0.5    - apply_ads(&conf, 2.0)).abs() < 0.001);
+        assert!((0.375  - apply_ads(&conf, 3.0)).abs() < 0.001);
+        assert!((0.375  - apply_r(&conf, 0.0, 0.375)).abs() < 0.001);
+        assert!((0.1875 - apply_r(&conf, 0.5, 0.375)).abs() < 0.001);
+        assert!((0.0    - apply_r(&conf, 1.0, 0.375)).abs() < 0.001);
+        assert!((0.0    - apply_r(&conf, 9.0, 0.375)).abs() < 0.001);
     }
 }

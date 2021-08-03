@@ -14,13 +14,14 @@ load_midi_floww("test", "/home/cody/git/music-gen/comping0.midi");
 
 add_sample_lerp("kick", 1.0, 0.0, "kick", "bassd", -1, 40);
 add_sample_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
-add_debug_sine("comp", 0.2, 0.0, "test");
+--add_debug_sine("comp", 0.2, 0.0, "test");
+add_synth("comp", 0.2, 0.0, "test", { 0.01, 0.1, 0.8, 5.0, 0.2, 0.5 });
 add_adsr("env", 1.0, 0.0, "snare", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
 add_normalize("sum", 1.0, 0.0);
 
 connect("kick", "sum");
 connect("snare", "env");
 connect("env", "sum");
---connect("comp", "sum");
+connect("comp", "sum");
 
 set_output("sum");

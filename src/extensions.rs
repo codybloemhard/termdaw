@@ -37,7 +37,7 @@ pub enum VertexExt{
     },
     Synth{
         floww_index: usize,
-        notes: Vec<(f32, f32, f32, bool)>,
+        notes: Vec<(f32, f32, f32, f32)>,
         conf: AdsrConf,
     },
     Lv2fx{
@@ -48,8 +48,8 @@ pub enum VertexExt{
         conf: AdsrConf,
         floww_index: usize,
         note: Option<usize>,
-        primary: (f32, f32, bool),
-        ghost: (f32, f32, bool),
+        primary: (f32, f32, f32),
+        ghost: (f32, f32, f32),
     },
 }
 
@@ -119,8 +119,8 @@ impl VertexExt{
             conf,
             note,
             floww_index,
-            primary: (0.0, 0.0, true),
-            ghost: (0.0, 0.0, true),
+            primary: (0.0, 0.0, 0.0),
+            ghost: (0.0, 0.0, 0.0),
         }
     }
 
@@ -313,31 +313,20 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
     }
 }
 
-fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, bool)>, conf: &AdsrConf, t: usize, sr: usize){
+fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>, conf: &AdsrConf, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
             if on{
-                let mut has = false;
-                for (n, v, t, abs) in notes.iter_mut(){
-                    if (*n - note).abs() < 0.001{
-                        *v = vel;
-                        *t = -(i as f32 / sr as f32);
-                        *abs = true;
-                        has = true;
-                        break;
-                    }
-                }
-                if !has {
-                    notes.push((note, vel, -(i as f32 / sr as f32), true));
-                }
+                notes.push((note, vel, -(i as f32 / sr as f32), 0.0));
             } else {
-                notes.retain(|x| (x.0 - note).abs() > 0.001 || x.3);
-                for (n, _, t, abs) in notes.iter_mut(){
+                notes.retain(|x| (x.0 - note).abs() > 0.001 || x.3 == 0.0);
+                for (n, _, env_t, relval) in notes.iter_mut(){
                     if (*n - note).abs() > 0.001 { continue; }
-                    if *abs{
-                        *t = -(i as f32 / sr as f32);
-                        *abs = false;
+                    if *relval == 0.0{
+                        let env_time = *env_t + (i as f32 / sr as f32);
+                        *relval = apply_ads(conf, env_time);
+                        *env_t = -(i as f32 / sr as f32);
                     } else {
                         panic!("Synth: impossible release stage note");
                     }
@@ -347,17 +336,21 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 
         buf.l[i] = 0.0;
         buf.r[i] = 0.0;
-        for (note, vel, env_t, ads) in notes.iter(){
+        for (note, vel, env_t, relval) in notes.iter(){
             let time = (t + i) as f32 / sr as f32;
             let env_time = env_t + (i as f32 / sr as f32);
-            let env_vel = if *ads { apply_ads(conf, env_time) }
-            else { apply_r(conf, env_time) };
+            let env_vel = if *relval == 0.0 { apply_ads(conf, env_time) }
+            else { apply_r(conf, env_time, *relval) };
             let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
             let s = (time * hz * 2.0 * PI).sin() * vel * env_vel;
             buf.l[i] += s;
             buf.r[i] += s;
         }
     }
+    for (_, _, env_t, _) in notes.iter_mut(){
+        *env_t += len as f32 / sr as f32;
+    }
+    notes.retain(|x| x.3 == 0.0 || x.2 <= conf.release_sec);
 }
 
 fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){
@@ -371,31 +364,31 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host
 }
 
 fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank, use_off: bool, floww_index: usize, sr: usize,
-            conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, bool), ghost: &mut (f32, f32, bool)){
+            conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
     sum_inputs(buf, len, res);
     fb.start_block(floww_index);
     if use_off{
         for i in 0..len{
+            let offset = i as f32 / sr as f32;
             for (on, n, v) in fb.get_block_simple(floww_index, i){
                 if let Some(target) = note{
                     if (target as f32 - n).abs() > 0.01 { continue; }
                 }
                 if on{
                     *ghost = *primary;
-                    *primary = (-(i as f32 / sr as f32), v, true);
-                } else if ghost.2 {
+                    *primary = (-(i as f32 / sr as f32), v, 0.0);
+                } else if ghost.2 == 0.0 {
                     ghost.0 = -(i as f32 / sr as f32);
-                    ghost.2 = false;
+                    ghost.2 = apply_ads(conf, ghost.0 + offset) * ghost.1;
                 } else {
                     primary.0 = -(i as f32 / sr as f32);
-                    primary.2 = false;
+                    primary.2 = apply_ads(conf, primary.0 + offset) * primary.1;
                 }
             }
-            let offset = i as f32 / sr as f32;
-            let pvel = if primary.2 { apply_ads(conf, primary.0 + offset) * primary.1 }
-            else { apply_r(conf, primary.0 + offset) * primary.1 };
-            let gvel = if ghost.2 { apply_ads(conf, ghost.0 + offset) * ghost.1 }
-            else { apply_r(conf, ghost.0 + offset) * ghost.1 };
+            let pvel = if primary.2 == 0.0 { apply_ads(conf, primary.0 + offset) * primary.1 }
+            else { apply_r(conf, primary.0 + offset, primary.2) * primary.1 };
+            let gvel = if ghost.2 == 0.0 { apply_ads(conf, ghost.0 + offset) * ghost.1 }
+            else { apply_r(conf, ghost.0 + offset, ghost.2) * ghost.1 };
             let vel = pvel.max(gvel);
 
             buf.l[i] *= vel;
@@ -408,7 +401,7 @@ fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank,
                     if (target as f32 - n).abs() > 0.01 { continue; }
                 }
                 *ghost = *primary;
-                *primary = (-(i as f32 / sr as f32), v, true);
+                *primary = (-(i as f32 / sr as f32), v, 0.0);
             }
             let offset = i as f32 / sr as f32;
             let pvel = apply_adsr(conf, primary.0 + offset) * primary.1;
