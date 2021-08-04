@@ -1,11 +1,14 @@
 use crate::sample::{ Sample, SampleBank };
 use crate::floww::{ FlowwBank };
 use crate::adsr::*;
+use crate::synth::*;
 
 use lv2hm::Lv2Host;
 
 use core::f32::consts::PI;
 use std::collections::{ VecDeque };
+
+pub type OscConf = (f32, f32, AdsrConf);
 
 pub enum VertexExt{
     Sum,
@@ -37,8 +40,10 @@ pub enum VertexExt{
     },
     Synth{
         floww_index: usize,
+        square_conf: OscConf,
+        topflat_conf: OscConf,
+        triangle_conf: OscConf,
         notes: Vec<(f32, f32, f32, f32)>,
-        conf: AdsrConf,
     },
     Lv2fx{
         index: usize,
@@ -99,11 +104,13 @@ impl VertexExt{
         }
     }
 
-    pub fn synth(floww_index: usize, conf: AdsrConf) -> Self{
+    pub fn synth(floww_index: usize, square_conf: OscConf) -> Self{
         Self::Synth{
             floww_index,
             notes: Vec::new(),
-            conf,
+            square_conf,
+            topflat_conf: (0.0, 0.0, hit_adsr_conf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
+            triangle_conf: (0.0, 0.0, hit_adsr_conf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
         }
     }
 
@@ -148,8 +155,8 @@ impl VertexExt{
             Self::DebugSine { floww_index, notes } => {
                 debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
-            Self::Synth { floww_index, notes, conf } => {
-                synth_gen(buf, fb, len, *floww_index, notes, &conf, t, sr);
+            Self::Synth { floww_index, notes, square_conf, topflat_conf, triangle_conf } => {
+                synth_gen(buf, fb, len, *floww_index, notes, &square_conf, &topflat_conf, &triangle_conf, t, sr);
             }
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
@@ -313,7 +320,8 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
     }
 }
 
-fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>, conf: &AdsrConf, t: usize, sr: usize){
+fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
+            square_conf: &OscConf, topflat_conf: &OscConf, triangle_conf: &OscConf, t: usize, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
@@ -325,7 +333,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
                     if (*n - note).abs() > 0.001 { continue; }
                     if *relval == 0.0{
                         let env_time = *env_t + (i as f32 / sr as f32);
-                        *relval = apply_ads(conf, env_time);
+                        *relval = apply_ads(&square_conf.2, env_time);
                         *env_t = -(i as f32 / sr as f32);
                     } else {
                         panic!("Synth: impossible release stage note");
@@ -339,10 +347,10 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
         for (note, vel, env_t, relval) in notes.iter(){
             let time = (t + i) as f32 / sr as f32;
             let env_time = env_t + (i as f32 / sr as f32);
-            let env_vel = if *relval == 0.0 { apply_ads(conf, env_time) }
-            else { apply_r(conf, env_time, *relval) };
+            let env_vel = if *relval == 0.0 { apply_ads(&square_conf.2, env_time) }
+            else { apply_r(&square_conf.2, env_time, *relval) };
             let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
-            let s = (time * hz * 2.0 * PI).sin() * vel * env_vel;
+            let s = square_sine_sample(time, hz, square_conf.1) * vel * env_vel * square_conf.0;
             buf.l[i] += s;
             buf.r[i] += s;
         }
@@ -350,7 +358,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
     for (_, _, env_t, _) in notes.iter_mut(){
         *env_t += len as f32 / sr as f32;
     }
-    notes.retain(|x| x.3 == 0.0 || x.2 <= conf.release_sec);
+    notes.retain(|x| x.3 == 0.0 || x.2 <= square_conf.2.release_sec);
 }
 
 fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){

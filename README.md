@@ -9,11 +9,11 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
     - 8, 16, 24 or 32 bit bitdepth
   - [x] Play back audio
 - Terminal UX
-    - [x] Controls: play, pause, stop
-    - [x] Controls: set/get time, dash in time
-    - [x] Controls: refresh, render
-    - [ ] View: Terminal logging, warnings, errors, colors
-    - [x] Toml configuration
+  - [x] Controls: play, pause, stop
+  - [x] Controls: set/get time, dash in time
+  - [x] Controls: refresh, render
+  - [ ] View: Terminal logging, warnings, errors, colors
+  - [x] Toml configuration
 - Structure
   - [x] Sample Bank
   - [x] Graph rendering structure
@@ -40,6 +40,9 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Load resources (samples and plugins)
   - [x] Construct graph
   - [x] Refreshable: remove old, add new, keep same
+- Docs
+  - [ ] Config documentation
+  - [ ] Examples
 
 ## Goals for later
 - [ ] Multitype graph
