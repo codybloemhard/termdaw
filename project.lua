@@ -10,13 +10,13 @@ load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav");
 load_midi_floww("bassd", "/home/cody/git/music-gen/bassd.midi");
 load_midi_floww("snare", "/home/cody/git/music-gen/snare.midi");
 load_midi_floww("test", "/home/cody/git/music-gen/comping0.midi");
--- load_lv2("compressor", "http://calf.sourceforge.net/plugins/Compressor");
 
 add_sample_lerp("kick", 1.0, 0.0, "kick", "bassd", -1, 40);
 add_sample_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
 --add_debug_sine("comp", 0.2, 0.0, "test");
-adsr = { 0.01, 0.1, 0.8, 5.0, 0.2, 0.5 };
-add_synth("comp", 0.2, 0.0, "test", 1.0, 0.5, adsr);
+hit_adsr = { 0.001, 0.02, 0.0, 0.0, 0.0, 0.0 }
+note_adsr = { 0.01, 0.1, 0.8, 5.0, 0.2, 0.5 };
+add_synth("comp", 0.3, 0.0, "test", 0.5, 0.2, hit_adsr, 1.0, 0.5, note_adsr, 0.0, {});
 add_adsr("env", 1.0, 0.0, "snare", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
 add_normalize("sum", 1.0, 0.0);
 

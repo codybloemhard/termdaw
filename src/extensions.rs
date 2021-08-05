@@ -8,8 +8,6 @@ use lv2hm::Lv2Host;
 use core::f32::consts::PI;
 use std::collections::{ VecDeque };
 
-pub type OscConf = (f32, f32, AdsrConf);
-
 pub enum VertexExt{
     Sum,
     Normalize{
@@ -104,13 +102,13 @@ impl VertexExt{
         }
     }
 
-    pub fn synth(floww_index: usize, square_conf: OscConf) -> Self{
+    pub fn synth(floww_index: usize, square_conf: OscConf, topflat_conf: OscConf, triangle_conf: OscConf) -> Self{
         Self::Synth{
             floww_index,
             notes: Vec::new(),
             square_conf,
-            topflat_conf: (0.0, 0.0, hit_adsr_conf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
-            triangle_conf: (0.0, 0.0, hit_adsr_conf(0.0, 0.0, 0.0, 0.0, 0.0, 0.0)),
+            topflat_conf,
+            triangle_conf,
         }
     }
 
@@ -322,6 +320,17 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
 
 fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
             square_conf: &OscConf, topflat_conf: &OscConf, triangle_conf: &OscConf, t: usize, sr: usize){
+    let osc_amp_multipier = 1.0 / (square_conf.0 + topflat_conf.0 + triangle_conf.0);
+    let mut release_sec = 0.0;
+    if square_conf.0 > 0.0 {
+        release_sec = square_conf.2.release_sec;
+    }
+    if topflat_conf.0 > 0.0 {
+        release_sec = release_sec.max(topflat_conf.2.release_sec);
+    }
+    if triangle_conf.0 > 0.0 {
+        release_sec = release_sec.max(triangle_conf.2.release_sec);
+    }
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
@@ -329,11 +338,10 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
                 notes.push((note, vel, -(i as f32 / sr as f32), 0.0));
             } else {
                 notes.retain(|x| (x.0 - note).abs() > 0.001 || x.3 == 0.0);
-                for (n, _, env_t, relval) in notes.iter_mut(){
+                for (n, _, env_t, rel_t) in notes.iter_mut(){
                     if (*n - note).abs() > 0.001 { continue; }
-                    if *relval == 0.0{
-                        let env_time = *env_t + (i as f32 / sr as f32);
-                        *relval = apply_ads(&square_conf.2, env_time);
+                    if *rel_t == 0.0{
+                        *rel_t = *env_t + (i as f32 / sr as f32);
                         *env_t = -(i as f32 / sr as f32);
                     } else {
                         panic!("Synth: impossible release stage note");
@@ -344,13 +352,25 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 
         buf.l[i] = 0.0;
         buf.r[i] = 0.0;
-        for (note, vel, env_t, relval) in notes.iter(){
+        for (note, vel, env_t, rel_t) in notes.iter(){
             let time = (t + i) as f32 / sr as f32;
             let env_time = env_t + (i as f32 / sr as f32);
-            let env_vel = if *relval == 0.0 { apply_ads(&square_conf.2, env_time) }
-            else { apply_r(&square_conf.2, env_time, *relval) };
             let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
-            let s = square_sine_sample(time, hz, square_conf.1) * vel * env_vel * square_conf.0;
+
+            let env_vel = |adsr_conf| if *rel_t == 0.0 { apply_ads(adsr_conf, env_time) }
+            else { apply_r_rt(adsr_conf, env_time, *rel_t) };
+
+            let mut s = 0.0;
+            if square_conf.0 > 0.0 {
+                s += square_sine_sample(time, hz, square_conf.1) * vel * env_vel(&square_conf.2) * square_conf.0;
+            }
+            if topflat_conf.0 > 0.0 {
+                s += topflat_sine_sample(time, hz, topflat_conf.1) * vel * env_vel(&topflat_conf.2) * topflat_conf.0;
+            }
+            if triangle_conf.0 > 0.0 {
+                s += triangle_sample(time, hz) * vel * env_vel(&triangle_conf.2) * triangle_conf.0;
+            }
+            s *= osc_amp_multipier;
             buf.l[i] += s;
             buf.r[i] += s;
         }
@@ -358,7 +378,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
     for (_, _, env_t, _) in notes.iter_mut(){
         *env_t += len as f32 / sr as f32;
     }
-    notes.retain(|x| x.3 == 0.0 || x.2 <= square_conf.2.release_sec);
+    notes.retain(|x| x.3 == 0.0 || x.2 <= release_sec);
 }
 
 fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){

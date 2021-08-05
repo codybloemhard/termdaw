@@ -1,5 +1,5 @@
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct AdsrConf{
     pub std_vel: f32,
     pub attack_sec: f32,
@@ -12,17 +12,19 @@ pub struct AdsrConf{
     pub release_vel: f32,
 }
 
-pub fn hit_adsr_conf(attack_sec: f32, decay_sec: f32, decay_vel: f32, sustain_sec: f32, sustain_vel: f32, release_sec: f32) -> AdsrConf{
-    AdsrConf{
-        std_vel: 0.0,
-        attack_sec,
-        attack_vel: 1.0,
-        decay_sec,
-        decay_vel,
-        sustain_sec,
-        sustain_vel,
-        release_vel: 0.0,
-        release_sec,
+impl AdsrConf{
+    pub fn hit_conf(attack_sec: f32, decay_sec: f32, decay_vel: f32, sustain_sec: f32, sustain_vel: f32, release_sec: f32) -> Self{
+        Self{
+            std_vel: 0.0,
+            attack_sec,
+            attack_vel: 1.0,
+            decay_sec,
+            decay_vel,
+            sustain_sec,
+            sustain_vel,
+            release_vel: 0.0,
+            release_sec,
+        }
     }
 }
 
@@ -60,9 +62,17 @@ pub fn apply_adsr(conf: &AdsrConf, t: f32) -> f32{
     }
 }
 
+// apply release with release time instead of release value
+pub fn apply_r_rt(conf: &AdsrConf, t: f32, rt: f32) -> f32{
+    let rv = apply_ads(conf, rt);
+    apply_r(conf, t, rv)
+}
+
 pub fn build_adsr_conf(arr: &[f32]) -> Option<AdsrConf>{
-    if arr.len() == 6 {
-        Some(hit_adsr_conf(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5]))
+    if arr.is_empty(){
+        Some(AdsrConf::default())
+    } else if arr.len() == 6 {
+        Some(AdsrConf::hit_conf(arr[0], arr[1], arr[2], arr[3], arr[4], arr[5]))
     } else if arr.len() == 9 {
         Some(AdsrConf{
             std_vel: arr[0],

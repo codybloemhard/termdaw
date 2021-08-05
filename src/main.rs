@@ -306,8 +306,9 @@ impl State{
             seed!("add_sample_lerp", (String, f32, f32, String, String, i32, i32), samplelerps);
                 // add_debug_sine(name, gain, angle, floww)
             seed!("add_debug_sine", (String, f32, f32, String), debugsines);
-                // add_synth(name, gain, angle, floww, osc_vel, osc_z, osc_adsr_conf)
-            seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>), synths);
+                // add_synth(name, gain, angle, floww, square_vel, square_z, square_adsr_conf,
+                //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_z, triangle_adsr_conf)
+            seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>), synths);
                 // add_lv2fx(name, gain, angle, plugin)
             seed!("add_lv2fx", (String, f32, f32, String), lv2fxs);
                 // add_adsr(name, gain, angle, floww, use_off, note, adsr_conf)
@@ -407,14 +408,23 @@ impl State{
             let floww = self.fb.get_index(&floww).unwrap();
             self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::debug_sine(floww)), name.to_owned());
         }
-        for (name, gain, angle, floww, osc_vel, osc_z, conf_arr) in &synths {
+        for (name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr) in &synths {
             let floww = self.fb.get_index(&floww).unwrap();
-            let conf = if let Some(config) = build_adsr_conf(&conf_arr){
+            let parse_adsr_conf = |arr| if let Some(config) = build_adsr_conf(arr){
                 config
             } else {
                 panic!("ADSR config must have 6 or 9 elements");
             };
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::synth(floww, (*osc_vel, *osc_z, conf))), name.to_owned());
+            let sq_adsr = parse_adsr_conf(sq_arr);
+            let tf_adsr = parse_adsr_conf(tf_arr);
+            let tr_adsr = parse_adsr_conf(tr_arr);
+            self.g.add(Vertex::new(bl, *gain, *angle,
+                VertexExt::synth(floww,
+                    (*sq_vel, sq_z.max(0.0001), sq_adsr),
+                    (*tf_vel, *tf_z, tf_adsr),
+                    (*tr_vel, 0.0, tr_adsr))),
+                name.to_owned()
+            );
         }
         for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
         for (name, gain, angle, floww, use_off, note, conf_arr) in &adsrs {
