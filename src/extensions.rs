@@ -319,17 +319,17 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
 }
 
 fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
-            square_conf: &OscConf, topflat_conf: &OscConf, triangle_conf: &OscConf, t: usize, sr: usize){
-    let osc_amp_multipier = 1.0 / (square_conf.0 + topflat_conf.0 + triangle_conf.0);
+            square: &OscConf, topflat: &OscConf, triangle: &OscConf, t: usize, sr: usize){
+    let osc_amp_multipier = 1.0 / (square.volume + topflat.volume + triangle.volume);
     let mut release_sec = 0.0;
-    if square_conf.0 > 0.0 {
-        release_sec = square_conf.2.release_sec;
+    if square.volume > 0.0 {
+        release_sec = square.adsr.release_sec;
     }
-    if topflat_conf.0 > 0.0 {
-        release_sec = release_sec.max(topflat_conf.2.release_sec);
+    if topflat.volume > 0.0 {
+        release_sec = release_sec.max(topflat.adsr.release_sec);
     }
-    if triangle_conf.0 > 0.0 {
-        release_sec = release_sec.max(triangle_conf.2.release_sec);
+    if triangle.volume > 0.0 {
+        release_sec = release_sec.max(triangle.adsr.release_sec);
     }
     fb.start_block(floww_index);
     for i in 0..len{
@@ -361,14 +361,14 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
             else { apply_r_rt(adsr_conf, env_time, *rel_t) };
 
             let mut s = 0.0;
-            if square_conf.0 > 0.0 {
-                s += square_sine_sample(time, hz, square_conf.1) * vel * env_vel(&square_conf.2) * square_conf.0;
+            if square.volume > 0.0 {
+                s += square_sine_sample(time, hz, square.param) * vel * env_vel(&square.adsr) * square.volume;
             }
-            if topflat_conf.0 > 0.0 {
-                s += topflat_sine_sample(time, hz, topflat_conf.1) * vel * env_vel(&topflat_conf.2) * topflat_conf.0;
+            if topflat.volume > 0.0 {
+                s += topflat_sine_sample(time, hz, topflat.param) * vel * env_vel(&topflat.adsr) * topflat.volume;
             }
-            if triangle_conf.0 > 0.0 {
-                s += triangle_sample(time, hz) * vel * env_vel(&triangle_conf.2) * triangle_conf.0;
+            if triangle.volume > 0.0 {
+                s += triangle_sample(time, hz) * vel * env_vel(&triangle.adsr) * triangle.volume;
             }
             s *= osc_amp_multipier;
             buf.l[i] += s;

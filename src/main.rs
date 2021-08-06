@@ -23,8 +23,9 @@ mod synth;
 use sample::*;
 use graph::*;
 use floww::*;
-use adsr::*;
 use extensions::*;
+use adsr::*;
+use synth::*;
 
 fn main() -> Result<(), String>{
     let mut file = File::open("project.toml").unwrap();
@@ -420,9 +421,9 @@ impl State{
             let tr_adsr = parse_adsr_conf(tr_arr);
             self.g.add(Vertex::new(bl, *gain, *angle,
                 VertexExt::synth(floww,
-                    (*sq_vel, sq_z.max(0.0001), sq_adsr),
-                    (*tf_vel, *tf_z, tf_adsr),
-                    (*tr_vel, 0.0, tr_adsr))),
+                    OscConf::new(*sq_vel, sq_z.max(0.0001), sq_adsr),
+                    OscConf::new(*tf_vel, *tf_z, tf_adsr),
+                    OscConf::new(*tr_vel, 0.0, tr_adsr))),
                 name.to_owned()
             );
         }

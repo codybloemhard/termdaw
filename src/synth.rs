@@ -1,7 +1,21 @@
 use std::f32::consts::PI;
 use crate::adsr::AdsrConf;
 
-pub type OscConf = (f32, f32, AdsrConf);
+pub struct OscConf{
+    pub volume: f32,
+    pub param: f32,
+    pub adsr: AdsrConf,
+}
+
+impl OscConf{
+    pub fn new(volume: f32, param: f32, adsr: AdsrConf) -> Self{
+        Self{
+            volume,
+            param,
+            adsr,
+        }
+    }
+}
 
 #[inline]
 pub fn square_sine_sample(t: f32, hz: f32, z: f32) -> f32{

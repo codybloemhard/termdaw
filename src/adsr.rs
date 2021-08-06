@@ -95,7 +95,7 @@ mod tests{
     use crate::adsr::*;
     #[test]
     fn adsr_0(){ // adsr test
-        let conf = hit_adsr_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
+        let conf = AdsrConf::hit_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
         assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
         assert!((0.5   - apply_adsr(&conf, 0.5)).abs() < 0.001);
         assert!((1.0   - apply_adsr(&conf, 1.0)).abs() < 0.001);
@@ -110,7 +110,7 @@ mod tests{
 
     #[test]
     fn adsr_1(){ // ads+r test, going into release mode after sustain window
-        let conf = hit_adsr_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
+        let conf = AdsrConf::hit_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
         assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
         assert!((0.5   - apply_ads(&conf, 0.5)).abs() < 0.001);
         assert!((1.0   - apply_ads(&conf, 1.0)).abs() < 0.001);
@@ -127,7 +127,7 @@ mod tests{
 
     #[test]
     fn adsr_2(){ // ads+r test, going into release mode in sustain window
-        let conf = hit_adsr_conf(1.0, 1.0, 0.5, 2.0, 0.25, 1.0);
+        let conf = AdsrConf::hit_conf(1.0, 1.0, 0.5, 2.0, 0.25, 1.0);
         assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
         assert!((0.5    - apply_ads(&conf, 0.5)).abs() < 0.001);
         assert!((1.0    - apply_ads(&conf, 1.0)).abs() < 0.001);
@@ -138,5 +138,20 @@ mod tests{
         assert!((0.1875 - apply_r(&conf, 0.5, 0.375)).abs() < 0.001);
         assert!((0.0    - apply_r(&conf, 1.0, 0.375)).abs() < 0.001);
         assert!((0.0    - apply_r(&conf, 9.0, 0.375)).abs() < 0.001);
+    }
+
+    #[test]
+    fn adsr_3(){ // ads+r test, apply_r_rt
+        let conf = AdsrConf::hit_conf(1.0, 1.0, 0.5, 2.0, 0.25, 1.0);
+        assert!(apply_adsr(&conf, 0.0).abs() < 0.001);
+        assert!((0.5    - apply_ads(&conf, 0.5)).abs() < 0.001);
+        assert!((1.0    - apply_ads(&conf, 1.0)).abs() < 0.001);
+        assert!((0.75   - apply_ads(&conf, 1.5)).abs() < 0.001);
+        assert!((0.5    - apply_ads(&conf, 2.0)).abs() < 0.001);
+        assert!((0.375  - apply_ads(&conf, 3.0)).abs() < 0.001);
+        assert!((0.375  - apply_r_rt(&conf, 0.0, 3.0)).abs() < 0.001);
+        assert!((0.1875 - apply_r_rt(&conf, 0.5, 3.0)).abs() < 0.001);
+        assert!((0.0    - apply_r_rt(&conf, 1.0, 3.0)).abs() < 0.001);
+        assert!((0.0    - apply_r_rt(&conf, 9.0, 3.0)).abs() < 0.001);
     }
 }
