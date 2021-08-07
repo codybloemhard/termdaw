@@ -95,8 +95,8 @@ impl Sample{
         );
         let waves_in = vec![self.l.clone(), self.r.clone()];
         let mut waves_out = resampler.process(&waves_in).unwrap();
-        let l = std::mem::replace(&mut waves_out[0], Vec::new());
-        let r = std::mem::replace(&mut waves_out[1], Vec::new());
+        let l = std::mem::take(&mut waves_out[0]);
+        let r = std::mem::take(&mut waves_out[1]);
         Self{
             l, r
         }
@@ -228,11 +228,7 @@ impl SampleBank{
     }
 
     pub fn get_index(&self, name: &str) -> Option<usize>{
-        if let Some(index) = self.names.get(name){
-            Some(*index)
-        } else {
-            None
-        }
+        self.names.get(name).copied()
     }
 
     pub fn get_sample(&self, index: usize) -> &Sample{

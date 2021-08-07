@@ -20,7 +20,7 @@ note_adsr = { 0.01, 0.1, 0.8, 5.0, 0.2, 0.5 };
 add_synth("comp", 0.3, 0.0, "test", 0.5, 0.2, hit_adsr, 1.0, 0.7, note_adsr, 0.0, {});
 add_adsr("env", 1.0, 0.0, "snare", false, -1, { 0.01, 0.1, 0.8, 0.1, 0.2, 0.01 });
 add_normalize("sum", 1.0, 0.0);
-add_lv2fx("reverb", 1.0, 0.0, "reverb");
+--add_lv2fx("reverb", 1.0, 0.0, "reverb");
 
 connect("kick", "sum");
 connect("snare", "env");

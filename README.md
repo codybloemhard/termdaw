@@ -61,6 +61,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 
 ## Bugs
 - Stop, and skipping through time messes up floww
+- Lv2fx having a stroke (distortion)
 
 ## Example
 ```toml

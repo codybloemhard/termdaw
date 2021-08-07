@@ -39,11 +39,7 @@ impl FlowwBank{
     }
 
     pub fn get_index(&self, name: &str) -> Option<usize>{
-        if let Some(index) = self.names.get(name){
-            Some(*index)
-        } else {
-            None
-        }
+        self.names.get(name).copied()
     }
 
     fn set_start_indices_to_frame(&mut self, t_frame: usize, do_skip: bool){

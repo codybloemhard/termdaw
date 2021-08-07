@@ -154,13 +154,13 @@ impl VertexExt{
                 debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
             Self::Synth { floww_index, notes, square_conf, topflat_conf, triangle_conf } => {
-                synth_gen(buf, fb, len, *floww_index, notes, &square_conf, &topflat_conf, &triangle_conf, t, sr);
+                synth_gen(buf, fb, len, *floww_index, notes, square_conf, topflat_conf, triangle_conf, t, sr);
             }
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, res, *index, host);
             },
             Self::Adsr { use_off, conf, note, floww_index, primary, ghost } => {
-                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, &conf, *note, primary, ghost);
+                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, conf, *note, primary, ghost);
             }
         }
         buf.apply_angle(angle, len);
