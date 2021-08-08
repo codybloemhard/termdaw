@@ -142,7 +142,7 @@ impl Graph{
             println!("TermDaw: error: output vertex not found.");
             return false;
         };
-        if self.edges[output].is_empty(){
+        if self.edges[output].is_empty() && self.vertices[output].has_input(){
             println!("TermDaw: error: output receives no inputs.");
             return false;
         }
@@ -225,14 +225,6 @@ impl Vertex{
 
     pub fn set_time(&mut self, t: usize){
         self.ext.set_time(t);
-    }
-
-    pub fn set_gain(&mut self, gain: f32){
-        self.gain = gain;
-    }
-
-    pub fn set_angle(&mut self, angle: f32){
-        self.angle = angle.min(90.0).max(-90.0);
     }
 }
 

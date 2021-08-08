@@ -31,7 +31,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sample lerp vertex
   - [x] Lv2 fx vertex
   - [x] Debug Sine synth vertex
-  - [ ] Simple synth vertex
+  - [x] Simple synth vertex
   - [ ] Wavetable synth vertex
 - Floww
   - [x] Read from midi

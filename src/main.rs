@@ -203,7 +203,7 @@ fn main() -> Result<(), String>{
             while time_since > millis_generated - 0.5 {
                 let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                 let chunk = chunk.unwrap();
-                let stream_data = chunk.clone().deinterleave();
+                let stream_data = chunk.clone().interleave();
                 device.queue(&stream_data);
                 millis_generated += state.config.settings.buffer_length as f32 / state.config.settings.project_samplerate as f32 * 1000.0;
                 state.fb.set_time_to_next_block();

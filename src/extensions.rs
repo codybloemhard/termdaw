@@ -383,11 +383,10 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 
 fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){
     sum_inputs(buf, len, res);
-    if let Some(outp_ref) = host.apply_plugin_n_frames(index, &buf.clone().deinterleave()){
-        for i in 0..len{
-            buf.l[i] = outp_ref[i * 2];
-            buf.r[i] = outp_ref[i * 2 + 1];
-        }
+    for i in 0..len{
+        let (l, r) = host.apply_plugin(index, (buf.l[i], buf.r[i]));
+        buf.l[i] = l;
+        buf.r[i] = r;
     }
 }
 

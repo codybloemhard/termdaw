@@ -30,7 +30,7 @@ impl Sample{
         self.l.len()
     }
 
-    pub fn is_empty(&self) -> bool{
+    pub fn _is_empty(&self) -> bool{
         self.l.is_empty()
     }
 
@@ -102,7 +102,7 @@ impl Sample{
         }
     }
 
-    pub fn deinterleave(self) -> Vec<f32>{
+    pub fn interleave(self) -> Vec<f32>{
         let mut res = Vec::new();
         for i in 0..self.len(){
             res.push(self.l[i]);
