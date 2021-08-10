@@ -1,4 +1,3 @@
--- Our lua file, where we do all the work
 set_length(40.0);
 set_render_samplerate(48000);
 set_render_bitdepth(16);

@@ -2,7 +2,7 @@
 name = "Example Project"
 
 [settings]
+main = "project.lua"
 buffer_length = 1024
 project_samplerate = 48000
-main = "project.lua"
-
+normalize_on_refresh = false

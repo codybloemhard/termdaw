@@ -16,8 +16,8 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Toml configuration
 - Structure
   - [x] Sample Bank
-  - [x] Graph rendering structure
   - [x] Floww Bank
+  - [x] Graph rendering structure
 - Base Vertex, with:
   - [x] Gain
   - [x] Panning
@@ -61,7 +61,6 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 
 ## Bugs
 - Stop, and skipping through time messes up floww
-- Lv2fx having a stroke (distortion)
 
 ## Example
 ```toml
