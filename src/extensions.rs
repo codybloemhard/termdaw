@@ -130,7 +130,12 @@ impl VertexExt{
     }
 
     pub fn set_time(&mut self, time: usize){
-        if let Self::SampleLoop{ t, .. } = self { *t = time; }
+        match self{
+            Self::SampleLoop { t, .. } => { *t = time; },
+            Self::DebugSine { notes, .. } => { notes.clear(); },
+            Self::Synth { notes, .. } => { notes.clear(); },
+            _ => {  },
+        }
     }
 
     pub fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){

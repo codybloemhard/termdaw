@@ -58,9 +58,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Lufs mastering tool
 - [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes
-
-## Bugs
-- Stop, and skipping through time messes up floww
+- [ ] Better scrolling through time handling of on/off notes
 
 ## Example
 ```toml

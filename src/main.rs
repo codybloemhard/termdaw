@@ -139,14 +139,20 @@ fn main() -> Result<(), String>{
                 ThreadMsg::Refresh => {
                     state.refresh(false)?;
                     playing = false;
+                    device.clear();
+                    device.pause();
                 },
                 ThreadMsg::Render => {
-                    state.render();
+                    device.clear();
+                    device.pause();
                     playing = false;
+                    state.render();
                 },
                 ThreadMsg::Normalize => {
-                    state.scan();
+                    device.clear();
+                    device.pause();
                     playing = false;
+                    state.scan();
                 },
                 ThreadMsg::Play => {
                     playing = true;
@@ -166,25 +172,19 @@ fn main() -> Result<(), String>{
                     state.fb.set_time(0);
                 },
                 ThreadMsg::Skip => {
-                    device.pause();
                     device.clear();
                     let time = state.g.change_time(5 * proj_sr, true);
                     state.fb.set_time(time);
-                    device.resume();
                 }
                 ThreadMsg::Prev => {
-                    device.pause();
                     device.clear();
                     let time = state.g.change_time(5 * proj_sr, false);
                     state.fb.set_time(time);
-                    device.resume();
                 }
                 ThreadMsg::Set(time) => {
-                    device.pause();
                     device.clear();
                     state.g.set_time(time);
                     state.fb.set_time(time);
-                    device.resume();
                 }
                 ThreadMsg::Get => {
                     let t = state.g.get_time();
