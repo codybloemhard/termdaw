@@ -36,7 +36,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - Floww
   - [x] Read from midi
 - Lua
-  - [x] To configure the project(sample rate, etc)
+  - [x] To configure the project (sample rate, etc)
   - [x] Load resources (samples and plugins)
   - [x] Construct graph
   - [x] Refreshable: remove old, add new, keep same

@@ -72,8 +72,8 @@ impl State{
                 };
             }
             // ---- Settings
-            self.lua.globals().set("set_length", scope.create_function_mut(|_, frames: usize| {
-                cs = ((psr * frames) as f32 / bl as f32).ceil() as usize;
+            self.lua.globals().set("set_length", scope.create_function_mut(|_, seconds: f32| {
+                cs = (psr as f32 * seconds / bl as f32).ceil() as usize;
                 Ok(())
             })?)?;
             setter!("set_render_samplerate", usize, render_sr);
