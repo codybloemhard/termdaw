@@ -70,6 +70,7 @@ buffer_length = 1024
 project_samplerate = 48000
 main = "project.lua"
 ```
+
 ```lua
 -- Our lua file, where we do all the work
 set_length(3.0);

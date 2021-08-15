@@ -196,15 +196,17 @@ pub struct Vertex{
     buf: Sample,
     gain: f32,
     angle: f32,
+    wet: f32,
     ext: VertexExt,
 }
 
 impl Vertex{
-    pub fn new(bl: usize, gain: f32, angle: f32, ext: VertexExt) -> Self{
+    pub fn new(bl: usize, gain: f32, angle: f32, wet: f32, ext: VertexExt) -> Self{
         Self{
             buf: Sample::new(bl),
             gain,
             angle: angle.min(90.0).max(-90.0),
+            wet: wet.min(1.0).max(0.0),
             ext,
         }
     }
@@ -215,7 +217,7 @@ impl Vertex{
 
     fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
-        self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, &mut self.buf, len, res, is_scan);
+        self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, len, res, is_scan);
     }
 
     // Whether or not you can connect another vertex to (into) this one

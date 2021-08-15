@@ -138,13 +138,15 @@ impl VertexExt{
         }
     }
 
-    pub fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    pub fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, wet: f32,
+                    buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+        if self.has_input(){
+            sum_inputs(buf, len, res);
+        }
         match self{
-            Self::Sum => {
-                sum_gen(buf, len, res);
-            },
+            Self::Sum => { },
             Self::Normalize { max } => {
-                normalize_gen(buf, len, res, max, is_scan);
+                normalize_gen(buf, len, wet, max, is_scan);
             },
             Self::SampleLoop { t, sample_index } => {
                 sample_loop_gen(buf, sb, len, t, *sample_index);
@@ -162,10 +164,10 @@ impl VertexExt{
                 synth_gen(buf, fb, len, *floww_index, notes, square_conf, topflat_conf, triangle_conf, t, sr);
             }
             Self::Lv2fx { index } => {
-                lv2fx_gen(buf, len, res, *index, host);
+                lv2fx_gen(buf, len, wet, *index, host);
             },
             Self::Adsr { use_off, conf, note, floww_index, primary, ghost } => {
-                adsr_gen(buf, len, res, fb, *use_off, *floww_index, sr, conf, *note, primary, ghost);
+                adsr_gen(buf, len, fb, wet, *use_off, *floww_index, sr, conf, *note, primary, ghost);
             }
         }
         buf.apply_angle(angle, len);
@@ -198,12 +200,8 @@ fn sum_inputs(buf: &mut Sample, len: usize, res: Vec<&Sample>){
     }
 }
 
-fn sum_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>){
-    sum_inputs(buf, len, res);
-}
-
-fn normalize_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, max: &mut f32, is_scan: bool){
-    sum_inputs(buf, len, res);
+fn normalize_gen(buf: &mut Sample, len: usize, wet: f32, max: &mut f32, is_scan: bool){
+    if wet < 0.0001 { return; }
     if is_scan{
         *max = buf.scan_max(len).max(*max);
     } else {
@@ -386,8 +384,8 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
     notes.retain(|x| x.3 == 0.0 || x.2 <= release_sec);
 }
 
-fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host: &mut Lv2Host){
-    sum_inputs(buf, len, res);
+fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv2Host){
+    if wet < 0.0001 { return; }
     for i in 0..len{
         let (l, r) = host.apply_plugin(index, (buf.l[i], buf.r[i]));
         buf.l[i] = l;
@@ -395,9 +393,9 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, index: usize, host
     }
 }
 
-fn adsr_gen(buf: &mut Sample, len: usize, res: Vec<&Sample>, fb: &mut FlowwBank, use_off: bool, floww_index: usize, sr: usize,
+fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, floww_index: usize, sr: usize,
             conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
-    sum_inputs(buf, len, res);
+    if wet < 0.0001 { return; }
     fb.start_block(floww_index);
     if use_off{
         for i in 0..len{

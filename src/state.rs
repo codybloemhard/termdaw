@@ -91,8 +91,8 @@ impl State{
             // ---- Graph
                 // add_sum(name, gain, angle)
             seed!("add_sum", (String, f32, f32), sums);
-                // add_normalize(name, gain, angle)
-            seed!("add_normalize", (String, f32, f32), norms);
+                // add_normalize(name, gain, angle, wet)
+            seed!("add_normalize", (String, f32, f32, f32), norms);
                 // add_sampleloop(name, gain, angle, sample)
             seed!("add_sampleloop", (String, f32, f32, String), sampleloops);
                 // add_sample_multi(name, gain, angle, sample, floww, note)
@@ -104,10 +104,10 @@ impl State{
                 // add_synth(name, gain, angle, floww, square_vel, square_z, square_adsr_conf,
                 //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_z, triangle_adsr_conf)
             seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>), synths);
-                // add_lv2fx(name, gain, angle, plugin)
-            seed!("add_lv2fx", (String, f32, f32, String), lv2fxs);
-                // add_adsr(name, gain, angle, floww, use_off, note, adsr_conf)
-            seed!("add_adsr", (String, f32, f32, String, bool, i32, Vec<f32>), adsrs);
+                // add_lv2fx(name, gain, angle, wet, plugin)
+            seed!("add_lv2fx", (String, f32, f32, f32, String), lv2fxs);
+                // add_adsr(name, gain, angle, wet, floww, use_off, note, adsr_conf)
+            seed!("add_adsr", (String, f32, f32, f32, String, bool, i32, Vec<f32>), adsrs);
                 // connect(name, name)
             seed!("connect", (String, String), edges);
             // ---- Output
@@ -181,15 +181,15 @@ impl State{
         // probably :)
         println!("Status: rebuilding graph.");
         self.g.reset();
-        for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sum()), name.to_owned()); }
-        for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::normalize()), name.to_owned()); }
-        for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_loop(self.sb.get_index(sample).unwrap())), name.to_owned()); }
+        for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned()); }
+        for (name, gain, angle, wet) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::normalize()), name.to_owned()); }
+        for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(self.sb.get_index(sample).unwrap())), name.to_owned()); }
         for (name, gain, angle, sample, floww, note) in &samplemultis {
             let sample = self.sb.get_index(sample).unwrap();
             let floww = self.fb.get_index(floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
         }
         for (name, gain, angle, sample, floww, note, lerp_len) in &samplelerps {
             let sample = self.sb.get_index(sample).unwrap();
@@ -197,11 +197,11 @@ impl State{
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let lerp_len = (*lerp_len).max(0) as usize;
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
         }
         for (name, gain, angle, floww) in &debugsines {
             let floww = self.fb.get_index(floww).unwrap();
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::debug_sine(floww)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::debug_sine(floww)), name.to_owned());
         }
         for (name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr) in &synths {
             let floww = self.fb.get_index(floww).unwrap();
@@ -213,7 +213,7 @@ impl State{
             let sq_adsr = parse_adsr_conf(sq_arr);
             let tf_adsr = parse_adsr_conf(tf_arr);
             let tr_adsr = parse_adsr_conf(tr_arr);
-            self.g.add(Vertex::new(bl, *gain, *angle,
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0,
                 VertexExt::synth(floww,
                     OscConf::new(*sq_vel, sq_z.max(0.0001), sq_adsr),
                     OscConf::new(*tf_vel, *tf_z, tf_adsr),
@@ -221,8 +221,8 @@ impl State{
                 name.to_owned()
             );
         }
-        for (name, gain, angle, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
-        for (name, gain, angle, floww, use_off, note, conf_arr) in &adsrs {
+        for (name, gain, angle, wet, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
+        for (name, gain, angle, wet, floww, use_off, note, conf_arr) in &adsrs {
             let floww = self.fb.get_index(floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
@@ -231,7 +231,7 @@ impl State{
             } else {
                 panic!("ADSR config must have 6 or 9 elements");
             };
-            self.g.add(Vertex::new(bl, *gain, *angle, VertexExt::adsr(*use_off, conf, note, floww)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, conf, note, floww)), name.to_owned());
         }
 
         for (a, b) in &edges { self.g.connect(a, b); }
