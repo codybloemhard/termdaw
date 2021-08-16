@@ -59,6 +59,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes
 - [ ] Better scrolling through time handling of on/off notes
+- [ ] Prune completely dry vertices
 
 ## Example
 ```toml

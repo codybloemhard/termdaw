@@ -28,13 +28,18 @@ impl AdsrConf{
     }
 }
 
+#[inline]
+pub fn lerp(a: f32, b: f32, t: f32) -> f32{
+    a + t * (b - a)
+}
+
 fn apply_ads_internal(conf: &AdsrConf, t: f32) -> f32{
     if t <= conf.attack_sec {
-        conf.std_vel + (conf.attack_vel - conf.std_vel) * (t / conf.attack_sec)
+        lerp(conf.std_vel, conf.attack_vel, t / conf.attack_sec)
     } else if t <= conf.attack_sec + conf.decay_sec{
-        conf.attack_vel + (conf.decay_vel - conf.attack_vel) * ((t - conf.attack_sec) / conf.decay_sec)
+        lerp(conf.attack_vel, conf.decay_vel, (t - conf.attack_sec) / conf.decay_sec)
     } else if t <= conf.attack_sec + conf.decay_sec + conf.sustain_sec{
-        conf.decay_vel + (conf.sustain_vel - conf.decay_vel) * ((t - conf.attack_sec - conf.decay_sec) / conf.sustain_sec)
+        lerp(conf.decay_vel, conf.sustain_vel, (t - conf.attack_sec - conf.decay_sec) / conf.sustain_sec)
     } else {
         -1000.0
     }
@@ -50,13 +55,13 @@ pub fn apply_ads(conf: &AdsrConf, t: f32) -> f32{
 }
 
 pub fn apply_r(conf: &AdsrConf, t: f32, old_val: f32) -> f32{
-    old_val + (conf.release_vel - old_val) * (t / conf.release_sec).min(1.0)
+    lerp(old_val, conf.release_vel, (t / conf.release_sec).min(1.0))
 }
 
 pub fn apply_adsr(conf: &AdsrConf, t: f32) -> f32{
     let res = apply_ads_internal(conf, t);
     if res <= -1.0{
-        conf.sustain_vel + (conf.release_vel - conf.sustain_vel) * ((t - conf.attack_sec - conf.decay_sec - conf.sustain_sec) / conf.release_sec).min(1.0)
+        lerp(conf.sustain_vel, conf.release_vel, ((t - conf.attack_sec - conf.decay_sec - conf.sustain_sec) / conf.release_sec).min(1.0))
     } else {
         res
     }

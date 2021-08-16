@@ -146,7 +146,7 @@ impl VertexExt{
         match self{
             Self::Sum => { },
             Self::Normalize { max } => {
-                normalize_gen(buf, len, wet, max, is_scan);
+                normalize_gen(buf, len, max, is_scan);
             },
             Self::SampleLoop { t, sample_index } => {
                 sample_loop_gen(buf, sb, len, t, *sample_index);
@@ -185,7 +185,7 @@ impl VertexExt{
             Self::Synth { .. } => false,
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
-         }
+        }
     }
 }
 
@@ -200,8 +200,7 @@ fn sum_inputs(buf: &mut Sample, len: usize, res: Vec<&Sample>){
     }
 }
 
-fn normalize_gen(buf: &mut Sample, len: usize, wet: f32, max: &mut f32, is_scan: bool){
-    if wet < 0.0001 { return; }
+fn normalize_gen(buf: &mut Sample, len: usize, max: &mut f32, is_scan: bool){
     if is_scan{
         *max = buf.scan_max(len).max(*max);
     } else {
@@ -387,9 +386,11 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv2Host){
     if wet < 0.0001 { return; }
     for i in 0..len{
-        let (l, r) = host.apply_plugin(index, (buf.l[i], buf.r[i]));
-        buf.l[i] = l;
-        buf.r[i] = r;
+        let ll = buf.l[i];
+        let rr = buf.r[i];
+        let (l, r) = host.apply_plugin(index, (ll, rr));
+        buf.l[i] = lerp(ll, l, wet);
+        buf.r[i] = lerp(rr, r, wet);
     }
 }
 
@@ -419,7 +420,7 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
             else { apply_r(conf, primary.0 + offset, primary.2) * primary.1 };
             let gvel = if ghost.2 == 0.0 { apply_ads(conf, ghost.0 + offset) * ghost.1 }
             else { apply_r(conf, ghost.0 + offset, ghost.2) * ghost.1 };
-            let vel = pvel.max(gvel);
+            let vel = lerp(1.0, pvel.max(gvel), wet);
 
             buf.l[i] *= vel;
             buf.r[i] *= vel;
@@ -436,7 +437,7 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
             let offset = i as f32 / sr as f32;
             let pvel = apply_adsr(conf, primary.0 + offset) * primary.1;
             let gvel = apply_adsr(conf, ghost.0 + offset) * ghost.1;
-            let vel = pvel.max(gvel);
+            let vel = lerp(1.0, pvel.max(gvel), wet);
 
             buf.l[i] *= vel;
             buf.r[i] *= vel;

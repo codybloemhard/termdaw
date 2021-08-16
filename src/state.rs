@@ -91,8 +91,8 @@ impl State{
             // ---- Graph
                 // add_sum(name, gain, angle)
             seed!("add_sum", (String, f32, f32), sums);
-                // add_normalize(name, gain, angle, wet)
-            seed!("add_normalize", (String, f32, f32, f32), norms);
+                // add_normalize(name, gain, angle)
+            seed!("add_normalize", (String, f32, f32), norms);
                 // add_sampleloop(name, gain, angle, sample)
             seed!("add_sampleloop", (String, f32, f32, String), sampleloops);
                 // add_sample_multi(name, gain, angle, sample, floww, note)
@@ -182,7 +182,7 @@ impl State{
         println!("Status: rebuilding graph.");
         self.g.reset();
         for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned()); }
-        for (name, gain, angle, wet) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::normalize()), name.to_owned()); }
+        for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(self.sb.get_index(sample).unwrap())), name.to_owned()); }
         for (name, gain, angle, sample, floww, note) in &samplemultis {
             let sample = self.sb.get_index(sample).unwrap();
