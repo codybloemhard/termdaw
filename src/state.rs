@@ -102,7 +102,7 @@ impl State{
                 // add_debug_sine(name, gain, angle, floww)
             seed!("add_debug_sine", (String, f32, f32, String), debugsines);
                 // add_synth(name, gain, angle, floww, square_vel, square_z, square_adsr_conf,
-                //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_z, triangle_adsr_conf)
+                //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_adsr_conf)
             seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>), synths);
                 // add_lv2fx(name, gain, angle, wet, plugin)
             seed!("add_lv2fx", (String, f32, f32, f32, String), lv2fxs);
