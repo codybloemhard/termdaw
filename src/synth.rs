@@ -33,4 +33,4 @@ pub fn triangle_sample(t: f32, hz: f32) -> f32{
 }
 
 // formula's i made for the square_sine and topflat_sine oscilators
-// https://graphtoy.com/?f1(x,t)=min(sin(x),0)*2+1&v1=false&f2(x,t)=max(sin(x),0)*2-1&v2=false&f3(x,t)=0.4&v3=true&f4(x,t)=(min(sin(x),f3(0))+((1-f3(0))/2))*(2/(1+f3(0)))&v4=false&f5(x,t)=(max(sin(x),-f3(0))-((1-f3(0))/2))*(2/(1+f3(0)))&v5=false&f6(x,t)=clamp(sin(x),%20-f3(0),%20f3(0))%20*%20(1%20/%20f3(0))&v6=true&grid=true&coords=0,0,4.205926793776712
+// https://graphtoy.com/?f1(x,t)=min(sin(x),0)*2+1&v1=false&f2(x,t)=max(sin(x),0)*2-1&v2=false&f3(x,t)=0.4&v3=false&f4(x,t)=(min(sin(x),f3(0))+((1-f3(0))/2))*(2/(1+f3(0)))&v4=true&f5(x,t)=(max(sin(x),-f3(0))-((1-f3(0))/2))*(2/(1+f3(0)))&v5=false&f6(x,t)=clamp(sin(x),-f3(0),f3(0))*(1/f3(0))&v6=true&grid=true&coords=0,0,4.205926793776712

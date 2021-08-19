@@ -41,8 +41,8 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Construct graph
   - [x] Refreshable: remove old, add new, keep same
 - Docs
-  - [ ] Config documentation
-  - [ ] Examples
+  - [x] Config documentation
+  - [x] Examples
 
 ## Goals for later
 - [ ] Multitype graph
