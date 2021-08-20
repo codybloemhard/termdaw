@@ -48,6 +48,7 @@ pub enum VertexExt{
     },
     Adsr{
         use_off: bool,
+        use_max: bool,
         conf: AdsrConf,
         floww_index: usize,
         note: Option<usize>,
@@ -118,9 +119,10 @@ impl VertexExt{
         }
     }
 
-    pub fn adsr(use_off: bool, conf: AdsrConf, note: Option<usize>, floww_index: usize) -> Self{
+    pub fn adsr(use_off: bool, use_max: bool, conf: AdsrConf, note: Option<usize>, floww_index: usize) -> Self{
         Self::Adsr{
             use_off,
+            use_max,
             conf,
             note,
             floww_index,
@@ -166,8 +168,8 @@ impl VertexExt{
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, wet, *index, host);
             },
-            Self::Adsr { use_off, conf, note, floww_index, primary, ghost } => {
-                adsr_gen(buf, len, fb, wet, *use_off, *floww_index, sr, conf, *note, primary, ghost);
+            Self::Adsr { use_off, use_max, conf, note, floww_index, primary, ghost } => {
+                adsr_gen(buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note, primary, ghost);
             }
         }
         buf.apply_angle(angle, len);
@@ -394,9 +396,11 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv
     }
 }
 
-fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, floww_index: usize, sr: usize,
-            conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
+fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, use_max: bool, floww_index: usize,
+            sr: usize, conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
     if wet < 0.0001 { return; }
+    let maxmul = if use_max { 1.0 } else { 0.0 };
+    let minmul = 1.0 - maxmul;
     fb.start_block(floww_index);
     if use_off{
         for i in 0..len{
@@ -420,7 +424,8 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
             else { apply_r(conf, primary.0 + offset, primary.2) * primary.1 };
             let gvel = if ghost.2 == 0.0 { apply_ads(conf, ghost.0 + offset) * ghost.1 }
             else { apply_r(conf, ghost.0 + offset, ghost.2) * ghost.1 };
-            let vel = lerp(1.0, pvel.max(gvel), wet);
+            let adsr_vel = pvel.max(gvel) * maxmul + pvel.min(gvel) * minmul;
+            let vel = lerp(1.0, adsr_vel, wet);
 
             buf.l[i] *= vel;
             buf.r[i] *= vel;
@@ -437,7 +442,8 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
             let offset = i as f32 / sr as f32;
             let pvel = apply_adsr(conf, primary.0 + offset) * primary.1;
             let gvel = apply_adsr(conf, ghost.0 + offset) * ghost.1;
-            let vel = lerp(1.0, pvel.max(gvel), wet);
+            let adsr_vel = pvel.max(gvel) * maxmul + pvel.min(gvel) * minmul;
+            let vel = lerp(1.0, adsr_vel, wet);
 
             buf.l[i] *= vel;
             buf.r[i] *= vel;

@@ -22,8 +22,8 @@ impl AdsrConf{
             decay_vel,
             sustain_sec,
             sustain_vel,
-            release_vel: 0.0,
             release_sec,
+            release_vel: 0.0,
         }
     }
 }
@@ -98,6 +98,7 @@ pub fn build_adsr_conf(arr: &[f32]) -> Option<AdsrConf>{
 #[cfg(test)]
 mod tests{
     use crate::adsr::*;
+
     #[test]
     fn adsr_0(){ // adsr test
         let conf = AdsrConf::hit_conf(1.0, 1.0, 0.5, 1.0, 0.25, 1.0);
@@ -158,5 +159,29 @@ mod tests{
         assert!((0.1875 - apply_r_rt(&conf, 0.5, 3.0)).abs() < 0.001);
         assert!((0.0    - apply_r_rt(&conf, 1.0, 3.0)).abs() < 0.001);
         assert!((0.0    - apply_r_rt(&conf, 9.0, 3.0)).abs() < 0.001);
+    }
+
+    #[test]
+    fn adsr_4(){ // adsr test that dips instead of peaks
+        let conf = AdsrConf{
+            std_vel: 1.0,
+            attack_sec: 1.0,
+            attack_vel: 0.0,
+            decay_sec: 0.5,
+            decay_vel: 0.0,
+            sustain_sec: 0.5,
+            sustain_vel: 0.0,
+            release_sec: 1.0,
+            release_vel: 1.0,
+        };
+        assert!((1.0   - apply_adsr(&conf, 0.0)).abs() < 0.001);
+        assert!((0.5   - apply_adsr(&conf, 0.5)).abs() < 0.001);
+        assert!((0.0   - apply_adsr(&conf, 1.0)).abs() < 0.001);
+        assert!((0.0   - apply_adsr(&conf, 1.5)).abs() < 0.001);
+        assert!((0.0   - apply_adsr(&conf, 2.0)).abs() < 0.001);
+        assert!((0.5   - apply_adsr(&conf, 2.5)).abs() < 0.001);
+        assert!((1.0   - apply_adsr(&conf, 3.0)).abs() < 0.001);
+        assert!((1.0   - apply_adsr(&conf, 4.0)).abs() < 0.001);
+        assert!((1.0   - apply_adsr(&conf, 8.0)).abs() < 0.001);
     }
 }

@@ -107,7 +107,7 @@ impl State{
                 // add_lv2fx(name, gain, angle, wet, plugin)
             seed!("add_lv2fx", (String, f32, f32, f32, String), lv2fxs);
                 // add_adsr(name, gain, angle, wet, floww, use_off, note, adsr_conf)
-            seed!("add_adsr", (String, f32, f32, f32, String, bool, i32, Vec<f32>), adsrs);
+            seed!("add_adsr", (String, f32, f32, f32, String, bool, bool, i32, Vec<f32>), adsrs);
                 // connect(name, name)
             seed!("connect", (String, String), edges);
             // ---- Output
@@ -222,7 +222,7 @@ impl State{
             );
         }
         for (name, gain, angle, wet, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
-        for (name, gain, angle, wet, floww, use_off, note, conf_arr) in &adsrs {
+        for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
             let floww = self.fb.get_index(floww).unwrap();
             let note = if note < &0 { None }
             else { Some(*note as usize) };
@@ -231,7 +231,7 @@ impl State{
             } else {
                 panic!("ADSR config must have 6 or 9 elements");
             };
-            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, conf, note, floww)), name.to_owned());
+            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, *use_max, conf, note, floww)), name.to_owned());
         }
 
         for (a, b) in &edges { self.g.connect(a, b); }

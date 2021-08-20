@@ -109,9 +109,11 @@ You contruct an adsr conf as an array of floats. You can either have 6 or 9 floa
   - triangle_adsr_conf: adsr conf for the triangle oscilator
   - For a better understanding of the first two oscilators see [graphtoy](https://graphtoy.com/?f1(x,t)=min(sin(x),0)*2+1&v1=false&f2(x,t)=max(sin(x),0)*2-1&v2=false&f3(x,t)=0.4&v3=true&f4(x,t)=(min(sin(x),f3(0))+((1-f3(0))/2))*(2/(1+f3(0)))&v4=false&f5(x,t)=(max(sin(x),-f3(0))-((1-f3(0))/2))*(2/(1+f3(0)))&v5=false&f6(x,t)=clamp(sin(x),%20-f3(0),%20f3(0))%20*%20(1%20/%20f3(0))&v6=true&grid=true&coords=0,0,4.205926793776712)
 - `add_lv2fx(name: string, gain: float, angle: float, wetness: float, plugin: string);` Adds a vertex that sums incomming audio and applies a lv2 fx plugin on it. wetness is how much of the new signal is mixed in. With 0.0 the vertex has no effect and with 1.0 the vertex outputs the signal after the plugin is aplied. With 0.5, for example, it is half the original signal and half the processed signal.
-- `add_adsr(name: string, gain: float, angle: float, wetness: float, floww: string, use_off: bool, note: int, adsr_conf: {float});` This vertex sums the intputs and takes a floww. Based on the flow it applies the adsr envelope on the input signal and outputs it.
+- `add_adsr(name: string, gain: float, angle: float, wetness: float, floww: string, use_off: bool, use_max: bool, note: int, adsr_conf: {float});`
+    This vertex sums the intputs and takes a floww. Based on the flow it applies the adsr envelope on the input signal and outputs it.
   - wettness: how much of the processed signal is mixed in 0.0 for none and 1.0 for full
   - use_off: whether to listen to the note off event off the floww
+  - use_max: whether to max (true) or min (true) the primary and ghost note values. Choose max if you have a normal envelope and min if you have an inverted one (ie. one that dips in velocity and has a default value of more than zero).
   - note: specific midi note value to trigger on, -1 for all notes
   - adsr_conf: the adsr config to apply on the audio
 - `connect(a: string, b: string);` Takes two names of vertices and connects them to eachother. The output of a will be the intput for b.
