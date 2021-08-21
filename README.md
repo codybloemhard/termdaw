@@ -22,6 +22,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Gain
   - [x] Panning
   - [x] Input summation
+  - [ ] Bounded normalization
 - Vertex types
   - [x] Sum vertex
   - [x] Normalize vertex
@@ -53,7 +54,6 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [ ] Floww type
   - [ ] Value type
 - [ ] Value automation
-- [ ] Bound normalization
 - [ ] Lv2 midi instrument vertex
 - [ ] Lufs mastering tool
 - [ ] Read floww from floww description

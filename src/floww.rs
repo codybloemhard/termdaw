@@ -42,6 +42,10 @@ impl FlowwBank{
         self.names.get(name).copied()
     }
 
+    pub fn get_max_vel_until(&self, index: usize, until: f32) -> f32{
+        max_floww_vel_until(&self.flowws[index], self.sr, until)
+    }
+
     fn set_start_indices_to_frame(&mut self, t_frame: usize, do_skip: bool){
         for (i, floww) in self.flowws.iter().enumerate(){
             let skip = if do_skip{ self.start_indices[i] }
@@ -124,7 +128,7 @@ impl FlowwBank{
 pub type Point = (usize, usize, f32, f32);
 pub type Floww = Vec<Point>;
 
-pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
+fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
     let ppqn = midi.get_ppqn() as f32;
     let mut time_mult = 1.0; // 60bpm per default
     let mut floww = Vec::new();
@@ -147,3 +151,22 @@ pub fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
     floww
 }
 
+fn max_floww_vel_until(floww: &[Point], sr: usize, until: f32) -> f32{
+    let sr = sr as f32;
+    let mut max = 0.0;
+    let mut map = HashMap::new();
+    for (frame, id, _, vel) in floww{
+        let time = *frame as f32 / sr;
+        if time >= until { break; }
+        if *vel > 0.0{
+            if map.contains_key(id) {
+                panic!("can't have two notes with the same note value so ill just die now");
+            }
+            map.insert(id, vel);
+            max += vel;
+        } else if let Some(vel) = map.remove(id){
+            max -= vel;
+        }
+    }
+    max
+}

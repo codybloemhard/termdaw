@@ -190,6 +190,25 @@ impl Graph{
         self.set_time(0);
         fb.set_time(0);
     }
+
+    fn scan_vertex(&mut self, index: usize, fb: &FlowwBank, until: f32) -> f32{
+        if index >= self.vertices.len() { return 0.0; }
+        if self.ran_status[index] { return 0.0; }
+        self.ran_status[index] = true;
+        let edges = self.edges[index].clone();
+        let mut bound_sum = 0.0;
+        for incoming_vertex in &edges{
+            bound_sum += self.scan_vertex(*incoming_vertex, fb, until);
+        }
+        self.vertices[index].bound(bound_sum, until, fb)
+    }
+
+    pub fn bounded_normalize_scan(&mut self, until: f32, fb: &FlowwBank){
+        let i = if let Some(index) = self.output_vertex{ index }
+        else { return; };
+        self.reset_ran_stati();
+        self.scan_vertex(i, fb, until);
+    }
 }
 
 pub struct Vertex{
@@ -227,6 +246,10 @@ impl Vertex{
 
     pub fn set_time(&mut self, t: usize){
         self.ext.set_time(t);
+    }
+
+    pub fn bound(&mut self, incoming: f32, until: f32, fb: &FlowwBank) -> f32{
+        self.ext.bound(incoming, until, fb) * self.gain
     }
 }
 

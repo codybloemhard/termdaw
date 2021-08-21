@@ -189,6 +189,20 @@ impl VertexExt{
             Self::Adsr { .. } => true,
         }
     }
+
+    pub fn bound(&mut self, incoming_bound: f32, until: f32, fb: &FlowwBank) -> f32{
+        match self{
+            Self::Sum => incoming_bound,
+            Self::Normalize { max } => { *max = incoming_bound; 1.0 },
+            Self::SampleLoop { .. } => 1.0,
+            Self::SampleMulti { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
+            Self::SampleLerp { .. } => 1.0,
+            Self::DebugSine { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
+            Self::Synth { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
+            Self::Lv2fx { .. } => incoming_bound,
+            Self::Adsr { .. } => incoming_bound,
+        }
+    }
 }
 
 fn sum_inputs(buf: &mut Sample, len: usize, res: Vec<&Sample>){
