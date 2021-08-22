@@ -33,7 +33,7 @@ pub struct State{
 }
 
 impl State{
-    pub fn refresh(&mut self, first: bool) -> Result<(), String>{
+    pub fn refresh(&mut self) -> Result<(), String>{
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
@@ -221,7 +221,9 @@ impl State{
                 name.to_owned()
             );
         }
-        for (name, gain, angle, wet, plugin) in &lv2fxs { self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned()); }
+        for (name, gain, angle, wet, plugin) in &lv2fxs {
+            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned());
+        }
         for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
             let floww = self.fb.get_index(floww).unwrap();
             let note = if note < &0 { None }
@@ -241,9 +243,7 @@ impl State{
             return Err("TermDaw: graph check failed.".to_owned());
         }
 
-        if self.config.settings.normalize_on_refresh() || first{
-            self.scan();
-        }
+        self.scan_bound(cs as f32 * bl as f32 / psr as f32);
 
         self.cur_samples = new_samples;
         self.cur_lv2plugins = new_lv2plugins;
@@ -253,8 +253,12 @@ impl State{
         Ok(())
     }
 
-    pub fn scan(&mut self){
-        self.g.scan(&self.sb, &mut self.fb, &mut self.host, self.cs);
+    pub fn scan_bound(&mut self, until: f32){
+        self.g.bounded_normalize_scan(until, &self.fb);
+    }
+
+    pub fn scan_exact(&mut self){
+        self.g.true_normalize_scan(&self.sb, &mut self.fb, &mut self.host, self.cs);
     }
 
     pub fn render(&mut self) {

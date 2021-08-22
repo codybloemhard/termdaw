@@ -26,6 +26,14 @@ impl AdsrConf{
             release_vel: 0.0,
         }
     }
+
+    pub fn max_vel(&self) -> f32{
+        self.std_vel
+            .max(self.attack_vel)
+            .max(self.decay_vel)
+            .max(self.sustain_vel)
+            .max(self.release_vel)
+    }
 }
 
 #[inline]

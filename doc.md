@@ -20,7 +20,6 @@ name = "Example Project"
 main = "project.lua"
 buffer_length = 1024
 project_samplerate = 48000
-normalize_on_refresh = false
 ```
 
 ### Fields
@@ -31,7 +30,6 @@ name                    | [project]     | Yes           | String| unnamed
 main                    | [settings]    | No            | String|
 buffer_length           | [settings]    | Yes           | Uint  | 1024
 project_samplerate      | [settings]    | Yes           | Uint  | 44100
-normalize_on_refresh    | [settings]    | Yes           | Bool  | True
 
 ## Tui
 

@@ -59,7 +59,7 @@ fn main() -> Result<(), String>{
         cur_lv2plugins: Vec::new(),
         cur_lv2params: Vec::new(),
     };
-    state.refresh(true)?;
+    state.refresh()?;
 
     let sdl_context = sdl2::init()?;
     let audio_subsystem = sdl_context.audio()?;
@@ -137,7 +137,7 @@ fn main() -> Result<(), String>{
                     break;
                 },
                 ThreadMsg::Refresh => {
-                    state.refresh(false)?;
+                    state.refresh()?;
                     playing = false;
                     device.clear();
                     device.pause();
@@ -152,7 +152,7 @@ fn main() -> Result<(), String>{
                     device.clear();
                     device.pause();
                     playing = false;
-                    state.scan();
+                    state.scan_exact();
                 },
                 ThreadMsg::Play => {
                     playing = true;

@@ -200,7 +200,7 @@ impl VertexExt{
             Self::DebugSine { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
             Self::Synth { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
             Self::Lv2fx { .. } => incoming_bound,
-            Self::Adsr { .. } => incoming_bound,
+            Self::Adsr { conf, .. } => incoming_bound * conf.max_vel(),
         }
     }
 }
@@ -338,7 +338,10 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
 
 fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
             square: &OscConf, topflat: &OscConf, triangle: &OscConf, t: usize, sr: usize){
-    let osc_amp_multipier = 1.0 / (square.volume + topflat.volume + triangle.volume);
+    let osc_amp_multipier = 1.0 / (
+        square.volume * square.adsr.max_vel() +
+        topflat.volume * topflat.adsr.max_vel() +
+        triangle.volume * triangle.adsr.max_vel());
     let mut release_sec = 0.0;
     if square.volume > 0.0 {
         release_sec = square.adsr.release_sec;

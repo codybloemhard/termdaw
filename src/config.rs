@@ -35,7 +35,6 @@ pub struct Settings{
     pub main: String,
     buffer_length: Option<usize>,
     project_samplerate: Option<usize>,
-    normalize_on_refresh: Option<bool>,
 }
 
 impl Settings{
@@ -45,10 +44,6 @@ impl Settings{
 
     pub fn project_samplerate(&self) -> usize{
         self.project_samplerate.unwrap_or(44100)
-    }
-
-    pub fn normalize_on_refresh(&self) -> bool{
-        self.normalize_on_refresh.unwrap_or(true)
     }
 }
 
