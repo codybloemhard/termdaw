@@ -178,15 +178,29 @@ impl Graph{
         }
     }
 
+    fn reset_normalize_vertices(&mut self){
+        for vertex in self.vertices.iter_mut(){
+            vertex.ext.reset_scan_normalization();
+        }
+    }
+
+    fn apply_normalize_vertices(&mut self){
+        for vertex in self.vertices.iter_mut(){
+            vertex.ext.apply_scan_normalization();
+        }
+    }
+
     pub fn true_normalize_scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
+        self.reset_normalize_vertices();
         fb.set_time(0);
         for j in 0..chunks {
             self.reset_ran_stati();
             self.run_vertex(j * self.max_buffer_len, sb, fb, host, i, true);
             fb.set_time_to_next_block();
         }
+        self.apply_normalize_vertices();
         self.set_time(0);
         fb.set_time(0);
     }
@@ -206,8 +220,10 @@ impl Graph{
     pub fn bounded_normalize_scan(&mut self, until: f32, fb: &FlowwBank){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
+        self.reset_normalize_vertices();
         self.reset_ran_stati();
         self.scan_vertex(i, fb, until);
+        self.apply_normalize_vertices();
     }
 }
 

@@ -12,6 +12,7 @@ pub enum VertexExt{
     Sum,
     Normalize{
         max: f32,
+        scan_max: f32,
     },
     SampleLoop{
         sample_index: usize,
@@ -64,7 +65,8 @@ impl VertexExt{
 
     pub fn normalize() -> Self{
         Self::Normalize{
-            max: 0.0, // value on scan
+            max: 0.0, // values on scan
+            scan_max: 0.0,
         }
     }
 
@@ -147,8 +149,8 @@ impl VertexExt{
         }
         match self{
             Self::Sum => { },
-            Self::Normalize { max } => {
-                normalize_gen(buf, len, max, is_scan);
+            Self::Normalize { max, scan_max } => {
+                normalize_gen(buf, len, max, scan_max, is_scan);
             },
             Self::SampleLoop { t, sample_index } => {
                 sample_loop_gen(buf, sb, len, t, *sample_index);
@@ -193,7 +195,7 @@ impl VertexExt{
     pub fn bound(&mut self, incoming_bound: f32, until: f32, fb: &FlowwBank) -> f32{
         match self{
             Self::Sum => incoming_bound,
-            Self::Normalize { max } => { *max = incoming_bound; 1.0 },
+            Self::Normalize { scan_max, .. } => { *scan_max = incoming_bound; 1.0 },
             Self::SampleLoop { .. } => 1.0,
             Self::SampleMulti { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
             Self::SampleLerp { .. } => 1.0,
@@ -201,6 +203,18 @@ impl VertexExt{
             Self::Synth { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
             Self::Lv2fx { .. } => incoming_bound,
             Self::Adsr { conf, .. } => incoming_bound * conf.max_vel(),
+        }
+    }
+
+    pub fn reset_scan_normalization(&mut self){
+        if let Self::Normalize { scan_max, .. } = self{
+            *scan_max = 0.0;
+        }
+    }
+
+    pub fn apply_scan_normalization(&mut self){
+        if let Self::Normalize { scan_max, max } = self{
+            *max = *scan_max;
         }
     }
 }
@@ -216,12 +230,11 @@ fn sum_inputs(buf: &mut Sample, len: usize, res: Vec<&Sample>){
     }
 }
 
-fn normalize_gen(buf: &mut Sample, len: usize, max: &mut f32, is_scan: bool){
+fn normalize_gen(buf: &mut Sample, len: usize, max: &mut f32, scan_max: &mut f32, is_scan: bool){
     if is_scan{
-        *max = buf.scan_max(len).max(*max);
-    } else {
-        buf.scale(len, 1.0 / *max);
+        *scan_max = buf.scan_max(len).max(*scan_max);
     }
+    buf.scale(len, 1.0 / *max);
 }
 
 fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize, sample_index: usize){
