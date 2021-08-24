@@ -111,8 +111,9 @@ impl Graph{
 
     pub fn set_time(&mut self, time: usize){
         self.t = time;
-        for v in &mut self.vertices{
+        for (i, v) in self.vertices.iter_mut().enumerate(){
             v.set_time(time);
+            println!("{}: {}", self.names[i], v.max);
         }
     }
 
@@ -233,6 +234,7 @@ pub struct Vertex{
     angle: f32,
     wet: f32,
     ext: VertexExt,
+    max: f32,
 }
 
 impl Vertex{
@@ -243,6 +245,7 @@ impl Vertex{
             angle: angle.min(90.0).max(-90.0),
             wet: wet.min(1.0).max(0.0),
             ext,
+            max: 0.0,
         }
     }
 
@@ -253,6 +256,7 @@ impl Vertex{
     fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
         self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, len, res, is_scan);
+        self.max = self.max.max(self.buf.scan_max(len));
     }
 
     // Whether or not you can connect another vertex to (into) this one

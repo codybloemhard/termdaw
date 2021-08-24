@@ -198,8 +198,8 @@ impl VertexExt{
             Self::Normalize { scan_max, .. } => { *scan_max = incoming_bound; 1.0 },
             Self::SampleLoop { .. } => 1.0,
             Self::SampleMulti { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
-            Self::SampleLerp { .. } => 1.0,
-            Self::DebugSine { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
+            Self::SampleLerp { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
+            Self::DebugSine { floww_index, .. } => { let x=fb.get_max_vel_until(*floww_index, until); println!("--{}", x); x },
             Self::Synth { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
             Self::Lv2fx { .. } => incoming_bound,
             Self::Adsr { conf, .. } => incoming_bound * conf.max_vel(),
@@ -351,7 +351,7 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
 
 fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
             square: &OscConf, topflat: &OscConf, triangle: &OscConf, t: usize, sr: usize){
-    let osc_amp_multipier = 1.0 / (
+    let osc_amp_multiplier = 1.0 / (
         square.volume * square.adsr.max_vel() +
         topflat.volume * topflat.adsr.max_vel() +
         triangle.volume * triangle.adsr.max_vel());
@@ -404,7 +404,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
             if triangle.volume > 0.0 {
                 s += triangle_sample(time, hz) * vel * env_vel(&triangle.adsr) * triangle.volume;
             }
-            s *= osc_amp_multipier;
+            s *= osc_amp_multiplier;
             buf.l[i] += s;
             buf.r[i] += s;
         }

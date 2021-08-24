@@ -153,7 +153,8 @@ fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
 
 fn max_floww_vel_until(floww: &[Point], sr: usize, until: f32) -> f32{
     let sr = sr as f32;
-    let mut max = 0.0;
+    let mut max = 0.0f32;
+    let mut current = 0.0;
     let mut map = HashMap::new();
     for (frame, id, _, vel) in floww{
         let time = *frame as f32 / sr;
@@ -163,9 +164,10 @@ fn max_floww_vel_until(floww: &[Point], sr: usize, until: f32) -> f32{
                 panic!("can't have two notes with the same note value so ill just die now");
             }
             map.insert(id, vel);
-            max += vel;
+            current += vel;
+            max = max.max(current);
         } else if let Some(vel) = map.remove(id){
-            max -= vel;
+            current -= vel;
         }
     }
     max
