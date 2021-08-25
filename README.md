@@ -22,7 +22,6 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Gain
   - [x] Panning
   - [x] Input summation
-  - [ ] Bounded normalization
 - Vertex types
   - [x] Sum vertex
   - [x] Normalize vertex
@@ -60,6 +59,9 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Linear interpolation of floww notes
 - [ ] Better scrolling through time handling of on/off notes
 - [ ] Prune completely dry vertices
+
+## Failed
+- [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.
 
 ## Example
 ```toml

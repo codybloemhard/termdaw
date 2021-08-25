@@ -111,9 +111,8 @@ impl Graph{
 
     pub fn set_time(&mut self, time: usize){
         self.t = time;
-        for (i, v) in self.vertices.iter_mut().enumerate(){
+        for v in self.vertices.iter_mut(){
             v.set_time(time);
-            println!("{}: {}", self.names[i], v.max);
         }
     }
 
@@ -179,52 +178,46 @@ impl Graph{
         }
     }
 
-    fn reset_normalize_vertices(&mut self){
+    fn reset_scan_normalize_vertices(&mut self){
         for vertex in self.vertices.iter_mut(){
             vertex.ext.reset_scan_normalization();
         }
     }
 
-    fn apply_normalize_vertices(&mut self){
+    fn apply_scan_normalize_vertices(&mut self){
         for vertex in self.vertices.iter_mut(){
             vertex.ext.apply_scan_normalization();
+        }
+    }
+
+    pub fn reset_normalize_vertices(&mut self){
+        for vertex in self.vertices.iter_mut(){
+            vertex.ext.reset_normalization();
+        }
+    }
+
+    pub fn print_normalization_values(&self){
+        for (i, vertex) in self.vertices.iter().enumerate(){
+            let nv = vertex.ext.get_normalization_value();
+            if nv > 0.0 {
+                println!(" {}: {}", self.names[i], nv);
+            }
         }
     }
 
     pub fn true_normalize_scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
-        self.reset_normalize_vertices();
+        self.reset_scan_normalize_vertices();
         fb.set_time(0);
         for j in 0..chunks {
             self.reset_ran_stati();
             self.run_vertex(j * self.max_buffer_len, sb, fb, host, i, true);
             fb.set_time_to_next_block();
         }
-        self.apply_normalize_vertices();
+        self.apply_scan_normalize_vertices();
         self.set_time(0);
         fb.set_time(0);
-    }
-
-    fn scan_vertex(&mut self, index: usize, fb: &FlowwBank, until: f32) -> f32{
-        if index >= self.vertices.len() { return 0.0; }
-        if self.ran_status[index] { return 0.0; }
-        self.ran_status[index] = true;
-        let edges = self.edges[index].clone();
-        let mut bound_sum = 0.0;
-        for incoming_vertex in &edges{
-            bound_sum += self.scan_vertex(*incoming_vertex, fb, until);
-        }
-        self.vertices[index].bound(bound_sum, until, fb)
-    }
-
-    pub fn bounded_normalize_scan(&mut self, until: f32, fb: &FlowwBank){
-        let i = if let Some(index) = self.output_vertex{ index }
-        else { return; };
-        self.reset_normalize_vertices();
-        self.reset_ran_stati();
-        self.scan_vertex(i, fb, until);
-        self.apply_normalize_vertices();
     }
 }
 
@@ -234,7 +227,6 @@ pub struct Vertex{
     angle: f32,
     wet: f32,
     ext: VertexExt,
-    max: f32,
 }
 
 impl Vertex{
@@ -245,7 +237,6 @@ impl Vertex{
             angle: angle.min(90.0).max(-90.0),
             wet: wet.min(1.0).max(0.0),
             ext,
-            max: 0.0,
         }
     }
 
@@ -256,7 +247,6 @@ impl Vertex{
     fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
         let len = self.buf.len().min(len);
         self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, len, res, is_scan);
-        self.max = self.max.max(self.buf.scan_max(len));
     }
 
     // Whether or not you can connect another vertex to (into) this one
@@ -266,10 +256,6 @@ impl Vertex{
 
     pub fn set_time(&mut self, t: usize){
         self.ext.set_time(t);
-    }
-
-    pub fn bound(&mut self, incoming: f32, until: f32, fb: &FlowwBank) -> f32{
-        self.ext.bound(incoming, until, fb) * self.gain
     }
 }
 

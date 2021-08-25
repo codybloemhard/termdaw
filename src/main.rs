@@ -79,7 +79,7 @@ fn main() -> Result<(), String>{
     thread::spawn(move || {
         let options = SkimOptionsBuilder::default()
             .height(Some("8%")).build().unwrap();
-        let input = "quit\nrender\nrefresh\nnormalize\nplay\npause\nstop\n>skip\n<prev\nset\nget".to_string();
+        let input = "quit\nrender\nrefresh\nnormalize\nplay\npause\nstop\n>skip\n<prev\nset\nget\nnorm-vals".to_string();
         let item_reader = SkimItemReader::default();
         loop{
             let items = item_reader.of_bufread(Cursor::new(input.clone()));
@@ -99,6 +99,7 @@ fn main() -> Result<(), String>{
                 else if command == "stop" { ThreadMsg::Stop }
                 else if command == ">skip" { ThreadMsg::Skip }
                 else if command == "<prev" { ThreadMsg::Prev }
+                else if command == "norm-vals" { ThreadMsg::NormVals }
                 else if command == "set" {
                     let raw = tbl::input_field();
                     let time: Option<f32> = tbl::string_to_value(&raw);
@@ -191,6 +192,9 @@ fn main() -> Result<(), String>{
                     let tf = t as f32 / proj_sr as f32;
                     println!("Frame: {}, Time: {}", t, tf);
                 }
+                ThreadMsg::NormVals => {
+                    state.g.print_normalization_values();
+                }
                 _ => {}
             }
             transmit_to_ui.send(ThreadMsg::Ready).unwrap();
@@ -215,6 +219,6 @@ fn main() -> Result<(), String>{
 
 #[derive(PartialEq)]
 pub enum ThreadMsg{
-    None, Ready, Quit, Refresh, Render, Normalize, Play, Pause, Stop, Skip, Prev, Set(usize), Get
+    None, Ready, Quit, Refresh, Render, Normalize, Play, Pause, Stop, Skip, Prev, Set(usize), Get, NormVals
 }
 

@@ -243,18 +243,14 @@ impl State{
             return Err("TermDaw: graph check failed.".to_owned());
         }
 
-        self.scan_bound(cs as f32 * bl as f32 / psr as f32);
-
         self.cur_samples = new_samples;
         self.cur_lv2plugins = new_lv2plugins;
         self.cur_lv2params = new_lv2params;
 
+        self.g.reset_normalize_vertices();
+
         println!("Status: refreshed.");
         Ok(())
-    }
-
-    pub fn scan_bound(&mut self, until: f32){
-        self.g.bounded_normalize_scan(until, &self.fb);
     }
 
     pub fn scan_exact(&mut self){

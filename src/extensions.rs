@@ -192,20 +192,6 @@ impl VertexExt{
         }
     }
 
-    pub fn bound(&mut self, incoming_bound: f32, until: f32, fb: &FlowwBank) -> f32{
-        match self{
-            Self::Sum => incoming_bound,
-            Self::Normalize { scan_max, .. } => { *scan_max = incoming_bound; 1.0 },
-            Self::SampleLoop { .. } => 1.0,
-            Self::SampleMulti { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
-            Self::SampleLerp { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
-            Self::DebugSine { floww_index, .. } => { let x=fb.get_max_vel_until(*floww_index, until); println!("--{}", x); x },
-            Self::Synth { floww_index, .. } => fb.get_max_vel_until(*floww_index, until),
-            Self::Lv2fx { .. } => incoming_bound,
-            Self::Adsr { conf, .. } => incoming_bound * conf.max_vel(),
-        }
-    }
-
     pub fn reset_scan_normalization(&mut self){
         if let Self::Normalize { scan_max, .. } = self{
             *scan_max = 0.0;
@@ -215,6 +201,20 @@ impl VertexExt{
     pub fn apply_scan_normalization(&mut self){
         if let Self::Normalize { scan_max, max } = self{
             *max = *scan_max;
+        }
+    }
+
+    pub fn reset_normalization(&mut self){
+        if let Self::Normalize{ max, .. } = self{
+            *max = 0.000001;
+        }
+    }
+
+    pub fn get_normalization_value(&self) -> f32{
+        if let Self::Normalize{ max, .. } = self{
+            *max
+        } else {
+            -1.0
         }
     }
 }
@@ -231,8 +231,11 @@ fn sum_inputs(buf: &mut Sample, len: usize, res: Vec<&Sample>){
 }
 
 fn normalize_gen(buf: &mut Sample, len: usize, max: &mut f32, scan_max: &mut f32, is_scan: bool){
+    let buf_max = buf.scan_max(len);
     if is_scan{
-        *scan_max = buf.scan_max(len).max(*scan_max);
+        *scan_max = buf_max.max(*scan_max);
+    } else {
+        *max = buf_max.max(*max);
     }
     buf.scale(len, 1.0 / *max);
 }
