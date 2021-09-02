@@ -144,7 +144,7 @@ impl SampleBank{
 
     pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
         if self.names.get(&name).is_some() {
-            return Err(format!("TermDaw: SampleBank: there is already an sample with name \"{}\" present.", name));
+            return Err(format!("TermDaw: SampleBank: there is already a sample with name \"{}\" present.", name));
         }
         let mut reader = if let Ok(reader) = hound::WavReader::open(file){
             reader

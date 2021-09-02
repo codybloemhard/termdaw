@@ -18,6 +18,7 @@ mod adsr;
 mod synth;
 mod config;
 mod state;
+mod bufferbank;
 
 use sample::*;
 use graph::*;
