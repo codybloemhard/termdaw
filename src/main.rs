@@ -25,6 +25,7 @@ use graph::*;
 use floww::*;
 use config::*;
 use state::*;
+use bufferbank::*;
 
 fn main() -> Result<(), String>{
     let config = Config::read("project.toml");
@@ -49,6 +50,7 @@ fn main() -> Result<(), String>{
         g: Graph::new(config.settings.buffer_length(), proj_sr),
         host: Lv2Host::new(1000, buffer_len * 2), // acount for l/r
         fb: FlowwBank::new(proj_sr, buffer_len),
+        bb: BufferBank::new(),
         contents,
         config,
         cs: 0,
@@ -57,6 +59,7 @@ fn main() -> Result<(), String>{
         output_vertex: String::new(),
         output_file: String::from("outp.wav"),
         cur_samples: Vec::new(),
+        cur_resources: Vec::new(),
         cur_lv2plugins: Vec::new(),
         cur_lv2params: Vec::new(),
     };

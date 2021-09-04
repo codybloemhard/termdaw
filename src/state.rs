@@ -5,6 +5,7 @@ use crate::graph::*;
 use crate::floww::*;
 use crate::config::*;
 use crate::sample::*;
+use crate::bufferbank::*;
 
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use fnrs::{ vecs };
@@ -20,6 +21,7 @@ pub struct State{
     pub g: Graph,
     pub host: Lv2Host,
     pub fb: FlowwBank,
+    pub bb: BufferBank,
     pub config: Config,
     pub contents: String,
     pub cs: usize,
@@ -28,6 +30,7 @@ pub struct State{
     pub output_vertex: String,
     pub output_file: String,
     pub cur_samples: Vec<(String, String)>,
+    pub cur_resources: Vec<(String, String)>,
     pub cur_lv2plugins: Vec<(String, String)>,
     pub cur_lv2params: Vec<(String, String, f32)>,
 }
@@ -42,7 +45,7 @@ impl State{
         file.read_to_string(&mut self.contents).unwrap();
 
         vecs!(
-            new_samples, new_lv2plugins, new_lv2params, midis,
+            new_samples, new_resources, new_lv2plugins, new_lv2params, midis,
             sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, lv2fxs, adsrs,
             edges
         );
@@ -82,6 +85,8 @@ impl State{
             // ---- Resources
                 // load_sample(name, file)
             seed!("load_sample", (String, String), new_samples);
+                // load_resource(name, file)
+            seed!("load_resource", (String, String), new_resources);
                 // load_midi(name, file)
             seed!("load_midi_floww", (String, String), midis);
                 // load_lv2(name, uri)
@@ -151,6 +156,17 @@ impl State{
         for (name, file) in pos {
             println!("Status: adding sample \"{}\" to the sample bank.", name);
             self.sb.add(name, &file)?;
+        }
+        // Same for resources
+        let (pos, neg) = diff(&self.cur_resources, &new_resources);
+        for (name, _) in neg {
+            println!("Info: resource \"{}\" will be removed.", name);
+            self.bb.mark_dead(&name);
+        }
+        println!("Status: refreshing resources.");
+        self.bb.refresh();
+        for (name, file) in pos{
+            self.bb.add(name, &file)?;
         }
         // Just reload all midi, so you can easily import newly inplace generated files
         self.fb.reset();
@@ -244,6 +260,7 @@ impl State{
         }
 
         self.cur_samples = new_samples;
+        self.cur_resources = new_resources;
         self.cur_lv2plugins = new_lv2plugins;
         self.cur_lv2params = new_lv2params;
 
