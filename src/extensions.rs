@@ -47,9 +47,9 @@ pub enum VertexExt{
     },
     SampSyn{
         floww_index: usize,
-        osc_conf: OscConf,
+        adsr: AdsrConf,
         wave_table: WaveTable,
-        notes: Vec<(f32, f32, f32, f32)>,
+        notes: Vec<(f32, f32, f32, f32, WaveTableState)>,
     },
     Lv2fx{
         index: usize,
@@ -122,10 +122,10 @@ impl VertexExt{
         }
     }
 
-    pub fn sampsyn(floww_index: usize, osc_conf: OscConf, wave_table: WaveTable) -> Self{
+    pub fn sampsyn(floww_index: usize, adsr: AdsrConf, wave_table: WaveTable) -> Self{
         Self::SampSyn{
             floww_index,
-            osc_conf,
+            adsr,
             wave_table,
             notes: Vec::new(),
         }
@@ -183,8 +183,8 @@ impl VertexExt{
             Self::Synth { floww_index, notes, square_conf, topflat_conf, triangle_conf } => {
                 synth_gen(buf, fb, len, *floww_index, notes, square_conf, topflat_conf, triangle_conf, t, sr);
             },
-            Self::SampSyn { floww_index, notes, osc_conf, wave_table } => {
-                sampsyn_gen(buf, fb, len, *floww_index, notes, osc_conf, wave_table, t, sr);
+            Self::SampSyn { floww_index, notes, adsr, wave_table } => {
+                sampsyn_gen(buf, fb, len, *floww_index, notes, adsr, wave_table, sr);
             },
             Self::Lv2fx { index } => {
                 lv2fx_gen(buf, len, wet, *index, host);
@@ -438,16 +438,17 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
     notes.retain(|x| x.3 == 0.0 || x.2 <= release_sec);
 }
 
-fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
-            conf: &OscConf, wave_table: &WaveTable, t: usize, sr: usize){
+fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32, WaveTableState)>,
+            adsr: &AdsrConf, wave_table: &WaveTable, sr: usize){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
             if on{
-                notes.push((note, vel, -(i as f32 / sr as f32), 0.0));
+                let init_state = initial_state(wave_table, 0.0);
+                notes.push((note, vel, -(i as f32 / sr as f32), 0.0, init_state));
             } else {
                 notes.retain(|x| (x.0 - note).abs() > 0.001 || x.3 == 0.0);
-                for (n, _, env_t, rel_t) in notes.iter_mut(){
+                for (n, _, env_t, rel_t, _) in notes.iter_mut(){
                     if (*n - note).abs() > 0.001 { continue; }
                     if *rel_t == 0.0{
                         *rel_t = *env_t + (i as f32 / sr as f32);
@@ -461,25 +462,24 @@ fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: us
 
         buf.l[i] = 0.0;
         buf.r[i] = 0.0;
-        for (note, vel, env_t, rel_t) in notes.iter(){
-            let time = (t + i) as f32 / sr as f32;
-            let env_time = env_t + (i as f32 / sr as f32);
-            let hz = 440.0 * (2.0f32).powf((note - 69.0) / 12.0);
+        for (note, vel, env_t, rel_t, state) in notes.iter_mut(){
+            let env_time = *env_t + (i as f32 / sr as f32);
+            let hz = 440.0 * (2.0f32).powf((*note - 69.0) / 12.0);
 
             let env_vel = |adsr_conf| if *rel_t == 0.0 { apply_ads(adsr_conf, env_time) }
             else { apply_r_rt(adsr_conf, env_time, *rel_t) };
 
             let mut s = 0.0;
-            //s += square_sine_sample(time, hz, square.param) * vel * env_vel(&conf.adsr) * conf.volume;
-            s += wavetable_act(wave_table, hz, env_time, sr as f32, 1)[0] * vel * env_vel(&conf.adsr) * conf.volume;
+            let vel = *vel * env_vel(adsr);
+            s += wavetable_act_state(wave_table, state, hz, env_time, sr as f32) * vel;
             buf.l[i] += s;
             buf.r[i] += s;
         }
     }
-    for (_, _, env_t, _) in notes.iter_mut(){
+    for (_, _, env_t, _, _) in notes.iter_mut(){
         *env_t += len as f32 / sr as f32;
     }
-    notes.retain(|x| x.3 == 0.0 || x.2 <= conf.adsr.release_sec);
+    notes.retain(|x| x.3 == 0.0 || x.2 <= adsr.release_sec);
 }
 
 fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv2Host){

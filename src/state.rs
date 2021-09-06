@@ -11,6 +11,7 @@ use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters
 use fnrs::{ vecs };
 use mlua::prelude::*;
 use lv2hm::Lv2Host;
+use sampsyn::*;
 
 use std::fs::File;
 use std::io::Read;
@@ -46,7 +47,7 @@ impl State{
 
         vecs!(
             new_samples, new_resources, new_lv2plugins, new_lv2params, midis,
-            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, lv2fxs, adsrs,
+            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, sampsyns, lv2fxs, adsrs,
             edges
         );
 
@@ -109,6 +110,8 @@ impl State{
                 // add_synth(name, gain, angle, floww, square_vel, square_z, square_adsr_conf,
                 //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_adsr_conf)
             seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>), synths);
+                // add_sampsyn(name, gain, angle, floww, adsr_conf, resource)
+            seed!("add_sampsyn", (String, f32, f32, String, Vec<f32>, String), sampsyns);
                 // add_lv2fx(name, gain, angle, wet, plugin)
             seed!("add_lv2fx", (String, f32, f32, f32, String), lv2fxs);
                 // add_adsr(name, gain, angle, wet, floww, use_off, note, adsr_conf)
@@ -236,6 +239,24 @@ impl State{
                     OscConf::new(*tr_vel, 0.0, tr_adsr))),
                 name.to_owned()
             );
+        }
+        for (name, gain, angle, floww, adsr_conf, resource) in &sampsyns {
+            let floww = self.fb.get_index(floww).unwrap();
+
+            let adsr = if let Some(config) = build_adsr_conf(adsr_conf){ config }
+            else { panic!("ADSR config must have 6 or 9 elements"); };
+
+            let buf_ind = if let Some(i) = self.bb.get_index(resource){ i }
+            else { panic!("Could not find resource named {}!", resource); };
+
+            let table = if let Some(t) = parse_wavetable_from_buffer(self.bb.get_buffer(buf_ind)) { t }
+            else {
+                println!("Could not parse wavetable from resource {}, using default table!", resource);
+                WaveTable::default()
+            };
+
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0,
+                VertexExt::sampsyn(floww, adsr, table)), name.to_owned());
         }
         for (name, gain, angle, wet, plugin) in &lv2fxs {
             self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned());
