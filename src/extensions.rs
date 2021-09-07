@@ -440,6 +440,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 
 fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32, WaveTableState)>,
             adsr: &AdsrConf, wave_table: &WaveTable, sr: usize){
+    let amp_multiplier = 1.0 / adsr.max_vel();
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
@@ -470,8 +471,8 @@ fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: us
             else { apply_r_rt(adsr_conf, env_time, *rel_t) };
 
             let mut s = 0.0;
-            let vel = *vel * env_vel(adsr);
-            s += wavetable_act_state(wave_table, state, hz, env_time, sr as f32) * vel;
+            let vel = *vel * env_vel(adsr) * amp_multiplier;
+            s += wavetable_act_state(wave_table, state, hz, env_time + *rel_t, sr as f32) * vel;
             buf.l[i] += s;
             buf.r[i] += s;
         }

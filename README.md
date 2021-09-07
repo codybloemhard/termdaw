@@ -32,7 +32,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Lv2 fx vertex
   - [x] Debug Sine synth vertex
   - [x] Simple synth vertex
-  - [ ] Wavetable synth vertex
+  - [x] Wavetable synth vertex
 - Floww
   - [x] Read from midi
 - Lua
@@ -58,7 +58,13 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes
 - [ ] Better scrolling through time handling of on/off notes
-- [ ] Prune completely dry vertices
+- [ ] Low pass vertex
+- [ ] High pass vertex
+- [ ] Band pass vertex
+- [ ] Split vertex
+- [ ] Active toggle on vertices
+- [ ] Inactivate completely dry vertices
+- [ ] Prune inactive vertices from the graph
 
 ## Failed
 - [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.
