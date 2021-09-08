@@ -53,6 +53,7 @@ fn main() -> Result<(), String>{
         bb: BufferBank::new(),
         contents,
         config,
+        loaded: false,
         cs: 0,
         render_sr: 48000,
         bd: 16,
@@ -63,7 +64,7 @@ fn main() -> Result<(), String>{
         cur_lv2plugins: Vec::new(),
         cur_lv2params: Vec::new(),
     };
-    state.refresh()?;
+    state.refresh();
 
     let sdl_context = sdl2::init()?;
     let audio_subsystem = sdl_context.audio()?;
@@ -137,29 +138,39 @@ fn main() -> Result<(), String>{
 
     loop {
         if let Ok(rec) = receive_in_main.try_recv(){
+            macro_rules! check_loaded{
+                () => {
+                    if !state.loaded{
+                        println!("State not loaded!");
+                    }
+                }
+            }
             match rec{
                 ThreadMsg::Quit => {
                     break;
                 },
                 ThreadMsg::Refresh => {
-                    state.refresh()?;
+                    state.refresh();
                     playing = false;
                     device.clear();
                     device.pause();
                 },
                 ThreadMsg::Render => {
+                    check_loaded!();
                     device.clear();
                     device.pause();
                     playing = false;
                     state.render();
                 },
                 ThreadMsg::Normalize => {
+                    check_loaded!();
                     device.clear();
                     device.pause();
                     playing = false;
                     state.scan_exact();
                 },
                 ThreadMsg::Play => {
+                    check_loaded!();
                     playing = true;
                     since = Instant::now();
                     millis_generated = 0.0;
@@ -170,6 +181,7 @@ fn main() -> Result<(), String>{
                     device.pause();
                 },
                 ThreadMsg::Stop => {
+                    check_loaded!();
                     playing = false;
                     device.pause();
                     device.clear();
@@ -177,21 +189,25 @@ fn main() -> Result<(), String>{
                     state.fb.set_time(0);
                 },
                 ThreadMsg::Skip => {
+                    check_loaded!();
                     device.clear();
                     let time = state.g.change_time(5 * proj_sr, true);
                     state.fb.set_time(time);
                 }
                 ThreadMsg::Prev => {
+                    check_loaded!();
                     device.clear();
                     let time = state.g.change_time(5 * proj_sr, false);
                     state.fb.set_time(time);
                 }
                 ThreadMsg::Set(time) => {
+                    check_loaded!();
                     device.clear();
                     state.g.set_time(time);
                     state.fb.set_time(time);
                 }
                 ThreadMsg::Get => {
+                    check_loaded!();
                     let t = state.g.get_time();
                     let tf = t as f32 / proj_sr as f32;
                     println!("Frame: {}, Time: {}", t, tf);
@@ -204,15 +220,19 @@ fn main() -> Result<(), String>{
             transmit_to_ui.send(ThreadMsg::Ready).unwrap();
         }
         if playing{
-            let time_since = since.elapsed().as_millis() as f32;
-            // render half second in advance to be played
-            while time_since > millis_generated - 0.5 {
-                let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
-                let chunk = chunk.unwrap();
-                let stream_data = chunk.clone().interleave();
-                device.queue(&stream_data);
-                millis_generated += buffer_len as f32 / proj_sr as f32 * 1000.0;
-                state.fb.set_time_to_next_block();
+            if !state.loaded {
+                playing = false;
+            } else {
+                let time_since = since.elapsed().as_millis() as f32;
+                // render half second in advance to be played
+                while time_since > millis_generated - 0.5 {
+                    let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
+                    let chunk = chunk.unwrap();
+                    let stream_data = chunk.clone().interleave();
+                    device.queue(&stream_data);
+                    millis_generated += buffer_len as f32 / proj_sr as f32 * 1000.0;
+                    state.fb.set_time_to_next_block();
+                }
             }
         }
         std::thread::sleep(Duration::from_millis(10));

@@ -25,6 +25,7 @@ pub struct State{
     pub bb: BufferBank,
     pub config: Config,
     pub contents: String,
+    pub loaded: bool,
     pub cs: usize,
     pub render_sr: usize,
     pub bd: usize,
@@ -37,7 +38,8 @@ pub struct State{
 }
 
 impl State{
-    pub fn refresh(&mut self) -> Result<(), String>{
+    pub fn refresh(&mut self) {
+        self.loaded = false;
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
@@ -158,7 +160,10 @@ impl State{
         self.sb.refresh();
         for (name, file) in pos {
             println!("Status: adding sample \"{}\" to the sample bank.", name);
-            self.sb.add(name, &file)?;
+            if let Err(msg) = self.sb.add(name, &file){
+                println!("{}", msg);
+                return;
+            }
         }
         // Same for resources
         let (pos, neg) = diff(&self.cur_resources, &new_resources);
@@ -169,12 +174,18 @@ impl State{
         println!("Status: refreshing resources.");
         self.bb.refresh();
         for (name, file) in pos{
-            self.bb.add(name, &file)?;
+            if let Err(msg) = self.bb.add(name, &file){
+                println!("{}", msg);
+                return;
+            }
         }
         // Just reload all midi, so you can easily import newly inplace generated files
         self.fb.reset();
         for (name, file) in midis{
-            self.fb.add_floww(name, &file);
+            if let Err(msg) = self.fb.add_floww(name, &file){
+                println!("{}", msg);
+                return;
+            }
         }
         // Also don't recreate plugins
         // TODO: make renaming possible
@@ -277,7 +288,8 @@ impl State{
 
         self.g.set_output(&self.output_vertex);
         if !self.g.check_graph(){
-            return Err("TermDaw: graph check failed.".to_owned());
+            println!("TermDaw: graph check failed!");
+            return;
         }
 
         self.cur_samples = new_samples;
@@ -288,7 +300,7 @@ impl State{
         self.g.reset_normalize_vertices();
 
         println!("Status: refreshed.");
-        Ok(())
+        self.loaded = true;
     }
 
     pub fn scan_exact(&mut self){
@@ -308,7 +320,8 @@ impl State{
             println!("TermDaw: warning: render will down sample from peak input quality({}) to {}.", msr, self.render_sr);
         }
         if !(self.bd == 8 || self.bd == 16 || self.bd == 24 || self.bd == 32) {
-            panic!("Bitdepth of {} not supported: choose bitdepth in {{8, 16, 24, 32}}.", self.bd);
+            println!("Bitdepth of {} not supported: choose bitdepth in {{8, 16, 24, 32}}.", self.bd);
+            return;
         }
         if mbd > self.bd{
             println!("TermDaw: warning: render will lose bitdepth from peak input quality({} bits) to {} bits", mbd, self.bd);

@@ -27,14 +27,15 @@ impl FlowwBank{
         self.names.clear();
     }
 
-    pub fn add_floww(&mut self, name: String, path: &str){
+    pub fn add_floww(&mut self, name: String, path: &str) -> Result<(), String>{
         if let Ok(midi) = MIDI::from_path(path){
             let floww = mono_midi_to_floww(midi, self.sr);
             self.flowws.push(floww);
             self.start_indices.push(0);
             self.names.insert(name, self.flowws.len() - 1);
+            Ok(())
         } else {
-            println!("Could not read midi file: {}", path);
+            Err(format!("Could not read midi file: {}", path))
         }
     }
 
