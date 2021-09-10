@@ -10,7 +10,7 @@ use crate::bufferbank::*;
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use fnrs::{ vecs };
 use mlua::prelude::*;
-use lv2hm::Lv2Host;
+use lv2hm::*;
 use sampsyn::*;
 
 use std::fs::File;
@@ -194,7 +194,36 @@ impl State{
             self.host.remove_plugin(&name);
         }
         for (name, uri) in pos {
-            self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()).unwrap_or_else(|_| panic!("Error: Lv2hm could not add plugin with uri {}.", uri));
+            if let Err(e) = self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()){
+                println!("Couldn't load Lv2 plugin with name: \"{}\" and uri: \"{}\".", name, uri);
+                match e{
+                    AddPluginError::CapacityReached => {
+                        println!("\tCapacity reached!");
+                    },
+                    AddPluginError::WorldIsNull => {
+                        println!("\tWorld is null!");
+                    },
+                    AddPluginError::PluginIsNull => {
+                        println!("\tPlugin is null!");
+                    },
+                    AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
+                        println!("\tPlugin has more than two input or output audio ports!");
+                        println!("\tAudio inputs: {}, audio outputs: {}", ins, outs);
+                    },
+                    AddPluginError::MoreThanOneAtomPort(atomports) => {
+                        println!("\tPlugin has more than one atom ports! Atom ports: {}.", atomports);
+                    },
+                    AddPluginError::PortNeitherInputOrOutput => {
+                        println!("\tPlugin has a port that is neither input or output.");
+                    },
+                    AddPluginError::PortNeitherControlOrAudioOrOptional => {
+                        println!("\tPlugin has a port that is neither control, audio or optional.");
+                    },
+                }
+                new_lv2plugins.retain(|i| i.0 != name);
+                self.cur_lv2plugins = new_lv2plugins;
+                return;
+            }
             println!("Info: added plugin {} with uri {}.", name, uri);
         }
 

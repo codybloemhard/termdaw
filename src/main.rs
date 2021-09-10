@@ -48,7 +48,7 @@ fn main() -> Result<(), String>{
         lua: Lua::new(),
         sb: SampleBank::new(proj_sr),
         g: Graph::new(config.settings.buffer_length(), proj_sr),
-        host: Lv2Host::new(1000, buffer_len * 2), // acount for l/r
+        host: Lv2Host::new(1000, buffer_len * 2, proj_sr), // acount for l/r
         fb: FlowwBank::new(proj_sr, buffer_len),
         bb: BufferBank::new(),
         contents,
@@ -139,9 +139,11 @@ fn main() -> Result<(), String>{
     loop {
         if let Ok(rec) = receive_in_main.try_recv(){
             macro_rules! check_loaded{
-                () => {
+                ($b:block) => {
                     if !state.loaded{
                         println!("State not loaded!");
+                    } else {
+                        $b;
                     }
                 }
             }
@@ -156,64 +158,74 @@ fn main() -> Result<(), String>{
                     device.pause();
                 },
                 ThreadMsg::Render => {
-                    check_loaded!();
-                    device.clear();
-                    device.pause();
-                    playing = false;
-                    state.render();
+                    check_loaded!({
+                        device.clear();
+                        device.pause();
+                        playing = false;
+                        state.render();
+                    });
                 },
                 ThreadMsg::Normalize => {
-                    check_loaded!();
-                    device.clear();
-                    device.pause();
-                    playing = false;
-                    state.scan_exact();
+                    check_loaded!({
+                        device.clear();
+                        device.pause();
+                        playing = false;
+                        state.scan_exact();
+                    });
                 },
                 ThreadMsg::Play => {
-                    check_loaded!();
-                    playing = true;
-                    since = Instant::now();
-                    millis_generated = 0.0;
-                    device.resume();
+                    check_loaded!({
+                        playing = true;
+                        since = Instant::now();
+                        millis_generated = 0.0;
+                        device.resume();
+                    });
                 },
                 ThreadMsg::Pause => {
                     playing = false;
                     device.pause();
                 },
                 ThreadMsg::Stop => {
-                    check_loaded!();
-                    playing = false;
-                    device.pause();
-                    device.clear();
-                    state.g.set_time(0);
-                    state.fb.set_time(0);
+                    check_loaded!({
+                        playing = false;
+                        device.pause();
+                        device.clear();
+                        state.g.set_time(0);
+                        state.fb.set_time(0);
+                    });
                 },
                 ThreadMsg::Skip => {
-                    check_loaded!();
-                    device.clear();
-                    let time = state.g.change_time(5 * proj_sr, true);
-                    state.fb.set_time(time);
+                    check_loaded!({
+                        device.clear();
+                        let time = state.g.change_time(5 * proj_sr, true);
+                        state.fb.set_time(time);
+                    });
                 }
                 ThreadMsg::Prev => {
-                    check_loaded!();
-                    device.clear();
-                    let time = state.g.change_time(5 * proj_sr, false);
-                    state.fb.set_time(time);
+                    check_loaded!({
+                        device.clear();
+                        let time = state.g.change_time(5 * proj_sr, false);
+                        state.fb.set_time(time);
+                    });
                 }
                 ThreadMsg::Set(time) => {
-                    check_loaded!();
-                    device.clear();
-                    state.g.set_time(time);
-                    state.fb.set_time(time);
+                    check_loaded!({
+                        device.clear();
+                        state.g.set_time(time);
+                        state.fb.set_time(time);
+                    });
                 }
                 ThreadMsg::Get => {
-                    check_loaded!();
-                    let t = state.g.get_time();
-                    let tf = t as f32 / proj_sr as f32;
-                    println!("Frame: {}, Time: {}", t, tf);
+                    check_loaded!({
+                        let t = state.g.get_time();
+                        let tf = t as f32 / proj_sr as f32;
+                        println!("Frame: {}, Time: {}", t, tf);
+                    });
                 }
                 ThreadMsg::NormVals => {
-                    state.g.print_normalization_values();
+                    check_loaded!({
+                        state.g.print_normalization_values();
+                    });
                 }
                 _ => {}
             }

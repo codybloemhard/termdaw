@@ -20,7 +20,8 @@ load_lv2("chorus", "http://calf.sourceforge.net/plugins/MultiChorus");
 load_lv2("compressor", "http://calf.sourceforge.net/plugins/Compressor");
 load_lv2("tape", "http://calf.sourceforge.net/plugins/TapeSimulator");
 
-parameter("compressor", "Attack", 10.0);
+parameter("compressor", "Attack", 40.0);
+parameter("compressor", "Release", 100.0);
 parameter("compressor", "Knee", 4.0);
 parameter("compressor", "Ratio", 2.0);
 
