@@ -43,9 +43,17 @@ impl State{
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
-        let mut file = File::open(&self.config.settings.main).unwrap();
+        let mut file = if let Ok(f) = File::open(&self.config.settings.main) { f }
+        else {
+            println!("Can't open main lua file!");
+            return;
+        };
         self.contents.clear();
-        file.read_to_string(&mut self.contents).unwrap();
+        if let Err(e) = file.read_to_string(&mut self.contents){
+            println!("Could not read main lua file!");
+            println!("\t{}", e);
+            return;
+        }
 
         vecs!(
             new_samples, new_resources, new_lv2plugins, new_lv2params, midis,
@@ -59,7 +67,7 @@ impl State{
         let mut output_file = std::mem::take(&mut self.output_file);
         let mut output_vertex = std::mem::take(&mut self.output_vertex);
 
-        self.lua.scope(|scope| {
+        let luares = self.lua.scope(|scope| {
             // ---- Macros
             macro_rules! seed{
                 ($name:expr, $stype:ty, $vec:ident) => {
@@ -126,7 +134,12 @@ impl State{
                 Ok(())
             })?)?;
             self.lua.load(&self.contents).exec()
-        }).unwrap();
+        });
+        if let Err(e) = luares{
+            println!("Could not execute lua code!");
+            println!("\t{}", e);
+            return;
+        }
 
         self.cs = cs;
         self.bd = bd;
@@ -240,30 +253,44 @@ impl State{
         // probably :)
         println!("Status: rebuilding graph.");
         self.g.reset();
+        macro_rules! get_index{
+            ($obj:ident, $arg:expr, $name:expr, $category:expr) => {
+                match self.$obj.get_index($arg){
+                    Some(i) => i,
+                    None => {
+                        println!("Could not get {} index for vertex \"{}\".", $category, $name);
+                        return;
+                    }
+                }
+            }
+        }
         for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::normalize()), name.to_owned()); }
-        for (name, gain, angle, sample) in &sampleloops { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(self.sb.get_index(sample).unwrap())), name.to_owned()); }
+        for (name, gain, angle, sample) in &sampleloops {
+            let index = get_index!(sb, sample, name, "sample");
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(index)), name.to_owned());
+        }
         for (name, gain, angle, sample, floww, note) in &samplemultis {
-            let sample = self.sb.get_index(sample).unwrap();
-            let floww = self.fb.get_index(floww).unwrap();
+            let sample = get_index!(sb, sample, name, "sample");
+            let floww = get_index!(fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
         }
         for (name, gain, angle, sample, floww, note, lerp_len) in &samplelerps {
-            let sample = self.sb.get_index(sample).unwrap();
-            let floww = self.fb.get_index(floww).unwrap();
+            let sample = get_index!(sb, sample, name, "sample");
+            let floww = get_index!(fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let lerp_len = (*lerp_len).max(0) as usize;
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
         }
         for (name, gain, angle, floww) in &debugsines {
-            let floww = self.fb.get_index(floww).unwrap();
+            let floww = get_index!(fb, floww, name, "floww");
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::debug_sine(floww)), name.to_owned());
         }
         for (name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr) in &synths {
-            let floww = self.fb.get_index(floww).unwrap();
+            let floww = get_index!(fb, floww, name, "floww");
             let parse_adsr_conf = |arr| if let Some(config) = build_adsr_conf(arr){
                 config
             } else {
@@ -281,7 +308,7 @@ impl State{
             );
         }
         for (name, gain, angle, floww, adsr_conf, resource) in &sampsyns {
-            let floww = self.fb.get_index(floww).unwrap();
+            let floww = get_index!(fb, floww, name, "floww");
 
             let adsr = if let Some(config) = build_adsr_conf(adsr_conf){ config }
             else { panic!("ADSR config must have 6 or 9 elements"); };
@@ -299,10 +326,11 @@ impl State{
                 VertexExt::sampsyn(floww, adsr, table)), name.to_owned());
         }
         for (name, gain, angle, wet, plugin) in &lv2fxs {
-            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(self.host.get_index(plugin).unwrap())), name.to_owned());
+            let index = get_index!(host, plugin, name, "plugin");
+            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)), name.to_owned());
         }
         for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
-            let floww = self.fb.get_index(floww).unwrap();
+            let floww = get_index!(fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let conf = if let Some(config) = build_adsr_conf(conf_arr){

@@ -2,6 +2,7 @@ use crate::sample::{ Sample, SampleBank };
 use crate::floww::{ FlowwBank };
 use crate::adsr::*;
 use crate::synth::*;
+use crate::graph::GenArgs;
 
 use lv2hm::Lv2Host;
 use sampsyn::*;
@@ -158,8 +159,9 @@ impl VertexExt{
         }
     }
 
-    pub fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, wet: f32,
-                    buf: &mut Sample, len: usize, res: Vec<&Sample>, is_scan: bool){
+    pub fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, wet: f32,
+                    buf: &mut Sample, res: Vec<&Sample>){
+        let (t, sr, len, is_scan) = ga;
         if self.has_input(){
             sum_inputs(buf, len, res);
         }

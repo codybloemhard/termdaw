@@ -105,7 +105,7 @@ impl Graph{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate(t, self.sr, sb, fb, host, self.max_buffer_len, is_scan, ins);
+            self.vertices[index].generate((t, self.sr, self.max_buffer_len, is_scan), sb, fb, host, ins);
         }
     }
 
@@ -220,6 +220,8 @@ impl Graph{
         fb.set_time(0);
     }
 }
+// t, sr, len, is_scan
+pub type GenArgs = (usize, usize, usize, bool);
 
 pub struct Vertex{
     buf: Sample,
@@ -244,9 +246,11 @@ impl Vertex{
         &self.buf
     }
 
-    fn generate(&mut self, t: usize, sr: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, len: usize, is_scan: bool, res: Vec<&Sample>){
-        let len = self.buf.len().min(len);
-        self.ext.generate(t, sr, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, len, res, is_scan);
+    // #[allow(clippy::too_many_arguments)]
+    fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, res: Vec<&Sample>){
+        let len = self.buf.len().min(ga.2);
+        let ga = (ga.0, ga.1, len, ga.3);
+        self.ext.generate(ga, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, res);
     }
 
     // Whether or not you can connect another vertex to (into) this one
