@@ -1,3 +1,5 @@
+use term_basics_linux::UC;
+
 use std::collections::{ HashMap, HashSet };
 use std::io::prelude::*;
 use std::fs::File;
@@ -21,16 +23,19 @@ impl BufferBank{
 
     pub fn add(&mut self, name: String, file_path: &str) -> Result<(), String>{
         if self.names.get(&name).is_some() {
-            return Err(format!("TermDaw: BlobBank: there is already a blob with name \"{}\" present.", name));
+            return Err(format!("{}TermDaw: BufferBank: there is already a blob with name {}\"{}\"{} present.",
+                UC::Red, UC::Blue, name, UC::Red));
         }
 
         let mut buffer = Vec::new();
         let mut file = if let Ok(file) = File::open(file_path) { file }
         else {
-            return Err(format!("TermDaw: BlobBank: could open read file \"{}\"", file_path));
+            return Err(format!("{}TermDaw: BufferBank: could open read file {}\"{}\"{}.",
+                UC::Red, UC::Blue, file_path, UC::Red));
         };
         if file.read_to_end(&mut buffer).is_err() {
-            return Err(format!("TermDaw: BlobBank: could not read file \"{}\"", file_path));
+            return Err(format!("{}TermDaw: BufferBank: could not read file {}\"{}\"{}.",
+                UC::Red, UC::Blue, file_path, UC::Red));
         }
 
         self.buffers.push(buffer);

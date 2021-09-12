@@ -12,6 +12,7 @@ use fnrs::{ vecs };
 use mlua::prelude::*;
 use lv2hm::*;
 use sampsyn::*;
+use term_basics_linux::*;
 
 use std::fs::File;
 use std::io::Read;
@@ -45,12 +46,12 @@ impl State{
 
         let mut file = if let Ok(f) = File::open(&self.config.settings.main) { f }
         else {
-            println!("Can't open main lua file!");
+            println!("{}Can't open main lua file!", UC::Red);
             return;
         };
         self.contents.clear();
         if let Err(e) = file.read_to_string(&mut self.contents){
-            println!("Could not read main lua file!");
+            println!("{}Could not read main lua file!", UC::Red);
             println!("\t{}", e);
             return;
         }
@@ -136,7 +137,7 @@ impl State{
             self.lua.load(&self.contents).exec()
         });
         if let Err(e) = luares{
-            println!("Could not execute lua code!");
+            println!("{}Could not execute lua code!", UC::Red);
             println!("\t{}", e);
             return;
         }
@@ -166,29 +167,29 @@ impl State{
         // samples may be long, try not to reallocate to much shit
         let (pos, neg) = diff(&self.cur_samples, &new_samples);
         for (name, _) in neg {
-            println!("Info: sample \"{}\" will be removed from the sample bank.", name);
+            println!("{}Info: sample {}\"{}\"{} will be removed from the sample bank.", UC::Std, UC::Blue, name, UC::Std);
             self.sb.mark_dead(&name);
         }
-        println!("Status: refreshing sample bank.");
+        println!("{}Status: refreshing sample bank.", UC::Std);
         self.sb.refresh();
         for (name, file) in pos {
-            println!("Status: adding sample \"{}\" to the sample bank.", name);
+            println!("{}Status: adding sample {}\"{}\"{} to the sample bank.", UC::Std, UC::Blue, name, UC::Std);
             if let Err(msg) = self.sb.add(name, &file){
-                println!("{}", msg);
+                println!("{}{}", UC::Red, msg);
                 return;
             }
         }
         // Same for resources
         let (pos, neg) = diff(&self.cur_resources, &new_resources);
         for (name, _) in neg {
-            println!("Info: resource \"{}\" will be removed.", name);
+            println!("{}Info: resource {}\"{}\"{} will be removed.", UC::Std, UC::Blue, name, UC::Std);
             self.bb.mark_dead(&name);
         }
-        println!("Status: refreshing resources.");
+        println!("{}Status: refreshing resources.", UC::Std);
         self.bb.refresh();
         for (name, file) in pos{
             if let Err(msg) = self.bb.add(name, &file){
-                println!("{}", msg);
+                println!("{}{}", UC::Red, msg);
                 return;
             }
         }
@@ -196,7 +197,7 @@ impl State{
         self.fb.reset();
         for (name, file) in midis{
             if let Err(msg) = self.fb.add_floww(name, &file){
-                println!("{}", msg);
+                println!("{}{}", UC::Red, msg);
                 return;
             }
         }
@@ -208,36 +209,40 @@ impl State{
         }
         for (name, uri) in pos {
             if let Err(e) = self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()){
-                println!("Couldn't load Lv2 plugin with name: \"{}\" and uri: \"{}\".", name, uri);
+                println!("{}Couldn't load Lv2 plugin with name: {}\"{}\"{} and uri: {}\"{}\"{}.",
+                        UC::Red, UC::Blue, name, UC::Red, UC::Blue, uri, UC::Red);
                 match e{
                     AddPluginError::CapacityReached => {
-                        println!("\tCapacity reached!");
+                        println!("{}\tCapacity reached!", UC::Red);
                     },
                     AddPluginError::WorldIsNull => {
-                        println!("\tWorld is null!");
+                        println!("{}\tWorld is null!", UC::Red);
                     },
                     AddPluginError::PluginIsNull => {
-                        println!("\tPlugin is null!");
+                        println!("{}\tPlugin is null!", UC::Red);
                     },
                     AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
-                        println!("\tPlugin has more than two input or output audio ports!");
-                        println!("\tAudio inputs: {}, audio outputs: {}", ins, outs);
+                        println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
+                        println!("{}\tAudio inputs: {}{}{}, audio outputs: {}{}",
+                                UC::Red, UC::Blue, ins, UC::Red, UC::Blue, outs);
                     },
                     AddPluginError::MoreThanOneAtomPort(atomports) => {
-                        println!("\tPlugin has more than one atom ports! Atom ports: {}.", atomports);
+                        println!("{}\tPlugin has more than one atom ports! Atom ports: {}{}{}.",
+                                UC::Red, UC::Blue, atomports, UC::Red);
                     },
                     AddPluginError::PortNeitherInputOrOutput => {
-                        println!("\tPlugin has a port that is neither input or output.");
+                        println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
                     },
                     AddPluginError::PortNeitherControlOrAudioOrOptional => {
-                        println!("\tPlugin has a port that is neither control, audio or optional.");
+                        println!("{}\tPlugin has a port that is neither control, audio or optional.", UC::Red);
                     },
                 }
                 new_lv2plugins.retain(|i| i.0 != name);
                 self.cur_lv2plugins = new_lv2plugins;
                 return;
             }
-            println!("Info: added plugin {} with uri {}.", name, uri);
+            println!("{}Info: added plugin {}{}{} with uri {}{}{}.",
+                    UC::Std, UC::Blue, name, UC::Std, UC::Blue, uri, UC::Std);
         }
 
         // need diff to see what params we need to reset
@@ -251,14 +256,15 @@ impl State{
 
         // just rebuild the damn thing, if it becomes problematic i'll do something about it,
         // probably :)
-        println!("Status: rebuilding graph.");
+        println!("{}Status: rebuilding graph.", UC::Std);
         self.g.reset();
         macro_rules! get_index{
             ($obj:ident, $arg:expr, $name:expr, $category:expr) => {
                 match self.$obj.get_index($arg){
                     Some(i) => i,
                     None => {
-                        println!("Could not get {} index for vertex \"{}\".", $category, $name);
+                        println!("{}Could not get {} index for vertex {}\"{}\"{}.",
+                                UC::Std, $category, UC::Blue, $name, UC::Std);
                         return;
                     }
                 }
@@ -318,7 +324,8 @@ impl State{
 
             let table = if let Some(t) = parse_wavetable_from_buffer(self.bb.get_buffer(buf_ind)) { t }
             else {
-                println!("Could not parse wavetable from resource {}, using default table!", resource);
+                println!("{}Could not parse wavetable from resource {}\"{}\"{}, using default table!",
+                        UC::Std, UC::Blue, resource, UC::Std);
                 WaveTable::default()
             };
 
@@ -345,7 +352,7 @@ impl State{
 
         self.g.set_output(&self.output_vertex);
         if !self.g.check_graph(){
-            println!("TermDaw: graph check failed!");
+            println!("{}TermDaw: graph check failed!", UC::Red);
             return;
         }
 
@@ -356,7 +363,7 @@ impl State{
 
         self.g.reset_normalize_vertices();
 
-        println!("Status: refreshed.");
+        println!("{}Ok: refreshed.", UC::Green);
         self.loaded = true;
     }
 
@@ -365,23 +372,27 @@ impl State{
     }
 
     pub fn render(&mut self) {
-        println!("Status: started rendering");
+        println!("{}Status: started rendering", UC::Std);
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
         let (msr, mbd) = self.sb.get_max_sr_bd();
         if psr > self.render_sr{
-            println!("TermDaw: warning: render will down sample from {}(project s.r.) to {}.", psr, self.render_sr);
+            println!("{}TermDaw: warning: render will down sample from {}{}{}(project s.r.) to {}{}{}.",
+                UC::Yellow, UC::Blue, psr, UC::Yellow, UC::Blue, self.render_sr, UC::Yellow);
         }
         if msr > self.render_sr{
-            println!("TermDaw: warning: render will down sample from peak input quality({}) to {}.", msr, self.render_sr);
+            println!("{}TermDaw: warning: render will down sample from peak input quality({}{}{}) to {}{}{}.",
+                UC::Yellow, UC::Blue, msr, UC::Yellow, UC::Blue, self.render_sr, UC::Yellow);
         }
         if !(self.bd == 8 || self.bd == 16 || self.bd == 24 || self.bd == 32) {
-            println!("Bitdepth of {} not supported: choose bitdepth in {{8, 16, 24, 32}}.", self.bd);
+            println!("{}Bitdepth of {}{}{} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
+                UC::Red, UC::Blue, self.bd, UC::Red);
             return;
         }
         if mbd > self.bd{
-            println!("TermDaw: warning: render will lose bitdepth from peak input quality({} bits) to {} bits", mbd, self.bd);
+            println!("{}TermDaw: warning: render will lose bitdepth from peak input quality({}{}{} bits) to {}{}{} bits",
+                UC::Yellow, UC::Blue, mbd, UC::Yellow, UC::Blue, self.bd, UC::Yellow);
         }
         let spec = hound::WavSpec{
             channels: 2,
@@ -437,7 +448,7 @@ impl State{
             }
         }
         self.g.set_time(0);
-        println!("Status: done rendering.");
+        println!("{}Ok: done rendering.", UC::Green);
     }
 }
 

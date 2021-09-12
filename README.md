@@ -12,7 +12,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Controls: play, pause, stop
   - [x] Controls: set/get time, dash in time
   - [x] Controls: refresh, render
-  - [ ] View: Terminal logging, warnings, errors, colors
+  - [x] View: Terminal logging, warnings, errors, colors
   - [x] Toml configuration
 - Structure
   - [x] Sample Bank

@@ -1,5 +1,6 @@
 use apres::{ MIDI };
 use apres::MIDIEvent::{ NoteOn, NoteOff, SetTempo };
+use term_basics_linux::UC;
 
 use std::collections::{ HashMap };
 
@@ -35,7 +36,8 @@ impl FlowwBank{
             self.names.insert(name, self.flowws.len() - 1);
             Ok(())
         } else {
-            Err(format!("Could not read midi file: {}", path))
+            Err(format!("{}Could not read midi file: {}\"{}\"{}.",
+                UC::Red, UC::Blue, path, UC::Red))
         }
     }
 

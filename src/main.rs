@@ -8,7 +8,7 @@ use mlua::prelude::*;
 use skim::prelude::*;
 use sdl2::audio::AudioSpecDesired;
 use lv2hm::Lv2Host;
-use term_basics_linux as tbl;
+use term_basics_linux::*;
 
 mod sample;
 mod graph;
@@ -27,16 +27,24 @@ use config::*;
 use state::*;
 use bufferbank::*;
 
-fn main() -> Result<(), String>{
+fn main(){
     let config = Config::read("project.toml");
 
-    println!("TermDaw: loading \"{}\" with \n\tbuffer_length = {} \n\tproject_samplerate = {} \n\tmain = \"{}\"",
-        config.project.name(),
-        config.settings.buffer_length(),
-        config.settings.project_samplerate(),
-        config.settings.main);
+    println!("{}TermDaw: loading {}\"{}\"{} with \n\tbuffer_length = {}{}{} \n\tproject_samplerate = {}{}{} \n\tmain = {}\"{}\"{}",
+        UC::Std, UC::Blue, config.project.name(), UC::Std,
+        UC::Blue, config.settings.buffer_length(), UC::Std,
+        UC::Blue, config.settings.project_samplerate(), UC::Std,
+        UC::Blue, config.settings.main, UC::Std);
 
-    let mut file = File::open(&config.settings.main).unwrap();
+    let mut file = match File::open(&config.settings.main){
+        Ok(f) => f,
+        Err(e) => {
+            println!("{}Error: could not open main lua file: {}\"{}\"{}.",
+                UC::Red, UC::Blue, config.settings.main, UC::Red);
+            println!("{}\t{}", UC::Red, e);
+            return;
+        }
+    };
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     std::mem::drop(file);
@@ -66,14 +74,35 @@ fn main() -> Result<(), String>{
     };
     state.refresh();
 
-    let sdl_context = sdl2::init()?;
-    let audio_subsystem = sdl_context.audio()?;
+    let sdl_context = match sdl2::init(){
+        Ok(x) => x,
+        Err(e) => {
+            println!("{}Error: can't initialize sdl2 context.", UC::Red);
+            println!("{}\t{}", UC::Red, e);
+            return;
+        }
+    };
+    let audio_subsystem = match sdl_context.audio(){
+        Ok(x) => x,
+        Err(e) => {
+            println!("{}Error: can't get sdl audio subsystem.", UC::Red);
+            println!("{}\t{}", UC::Red, e);
+            return;
+        }
+    };
     let desired_spec = AudioSpecDesired {
         freq: Some(proj_sr as i32),
         channels: Some(2),
         samples: None,
     };
-    let device = audio_subsystem.open_queue::<f32, _>(None, &desired_spec)?;
+    let device = match audio_subsystem.open_queue::<f32, _>(None, &desired_spec){
+        Ok(x) => x,
+        Err(e) => {
+            println!("{}Error: can't open sdl audio queue.", UC::Red);
+            println!("{}\t{}", UC::Red, e);
+            return;
+        }
+    };
     let mut playing = false;
     let mut since = Instant::now();
     let mut millis_generated = 0f32;
@@ -94,7 +123,7 @@ fn main() -> Result<(), String>{
 
             if let Some(item) = selected_items.get(0){
                 let command = item.output();
-                println!("---- {}", command);
+                println!("{}---- {}", UC::Magenta, command);
                 let tmsg = if command == "quit" { ThreadMsg::Quit }
                 else if command == "refresh" { ThreadMsg::Refresh }
                 else if command == "render" { ThreadMsg::Render }
@@ -106,18 +135,18 @@ fn main() -> Result<(), String>{
                 else if command == "<prev" { ThreadMsg::Prev }
                 else if command == "norm-vals" { ThreadMsg::NormVals }
                 else if command == "set" {
-                    let raw = tbl::input_field();
-                    let time: Option<f32> = tbl::string_to_value(&raw);
+                    let raw = input_field();
+                    let time: Option<f32> = string_to_value(&raw);
                     if let Some(float) = time{
                         if float >= 0.0{
                             let t = (float * proj_sr as f32) as usize;
                             ThreadMsg::Set(t)
                         } else {
-                            println!("Error: time needs to be positive.");
+                            println!("{}Error: time needs to be positive.", UC::Red);
                             ThreadMsg::None
                         }
                     } else {
-                        println!("Error: could not parse time, did not set time.");
+                        println!("{}Error: could not parse time, did not set time.", UC::Red);
                         ThreadMsg::None
                     }
                 }
@@ -125,7 +154,7 @@ fn main() -> Result<(), String>{
                 else { ThreadMsg::None };
                 transmit_to_main.send(tmsg).unwrap();
             } else {
-                println!("TermDaw: command not found!");
+                println!("{}TermDaw: command not found!", UC::Red);
                 continue;
             }
             for received in &receive_in_ui{
@@ -141,7 +170,7 @@ fn main() -> Result<(), String>{
             macro_rules! check_loaded{
                 ($b:block) => {
                     if !state.loaded{
-                        println!("State not loaded!");
+                        println!("{}State not loaded!", UC::Red);
                     } else {
                         $b;
                     }
@@ -219,7 +248,8 @@ fn main() -> Result<(), String>{
                     check_loaded!({
                         let t = state.g.get_time();
                         let tf = t as f32 / proj_sr as f32;
-                        println!("Frame: {}, Time: {}", t, tf);
+                        println!("{}Frame: {}{}{}, Time: {}{}",
+                            UC::Std, UC::Blue, t, UC::Std, UC::Blue, tf);
                     });
                 }
                 ThreadMsg::NormVals => {
@@ -249,8 +279,6 @@ fn main() -> Result<(), String>{
         }
         std::thread::sleep(Duration::from_millis(10));
     }
-
-    Ok(())
 }
 
 #[derive(PartialEq)]

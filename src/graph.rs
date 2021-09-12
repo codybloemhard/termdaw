@@ -3,6 +3,7 @@ use crate::floww::{ FlowwBank };
 use crate::extensions::*;
 
 use lv2hm::Lv2Host;
+use term_basics_linux::UC;
 
 use std::collections::{ HashMap };
 
@@ -78,11 +79,13 @@ impl Graph{
         let a_res = self.name_map.get(a);
         let b_res = self.name_map.get(b);
         if a_res.is_none() {
-            println!("TermDaw: warning: vertex \"{}\" cannot be found and thus can't be connected.", a);
+            println!("{}TermDaw: warning: vertex {}\"{}\"{} cannot be found and thus can't be connected.",
+                UC::Yellow, UC::Blue, a, UC::Yellow);
             return false;
         }
         if b_res.is_none() {
-            println!("TermDaw: warning: vertex \"{}\" cannot be found and thus can't be connected to.", b);
+            println!("{}TermDaw: warning: vertex {}\"{}\"{} cannot be found and thus can't be connected to.",
+                UC::Yellow, UC::Blue, b, UC::Yellow);
             return false;
         }
         let a_index = *a_res.unwrap();
@@ -139,11 +142,11 @@ impl Graph{
     pub fn check_graph(&self) -> bool{
         let output = if let Some(out) = self.output_vertex{ out }
         else {
-            println!("TermDaw: error: output vertex not found.");
+            println!("{}TermDaw: error: output vertex not found.", UC::Red);
             return false;
         };
         if self.edges[output].is_empty() && self.vertices[output].has_input(){
-            println!("TermDaw: error: output receives no inputs.");
+            println!("{}TermDaw: error: output receives no inputs.", UC::Red);
             return false;
         }
         let mut set = vec![false; self.vertices.len()];
@@ -156,7 +159,8 @@ impl Graph{
         find_connected_component(output, &self.edges, &mut set);
         for (i, x) in set.into_iter().enumerate(){
             if x { continue; }
-            println!("TermDaw: warning: vertex \"{}\" does not reach output.", self.names[i]);
+            println!("{}TermDaw: warning: vertex {}\"{}\"{} does not reach output.",
+                UC::Yellow, UC::Blue, self.names[i], UC::Yellow);
         }
         true
     }
@@ -200,7 +204,7 @@ impl Graph{
         for (i, vertex) in self.vertices.iter().enumerate(){
             let nv = vertex.ext.get_normalization_value();
             if nv > 0.0 {
-                println!(" {}: {}", self.names[i], nv);
+                println!("{} {}: {}", UC::Magenta, self.names[i], nv);
             }
         }
     }
