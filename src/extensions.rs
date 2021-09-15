@@ -64,6 +64,12 @@ pub enum VertexExt{
         primary: (f32, f32, f32),
         ghost: (f32, f32, f32),
     },
+    LowPass{
+        gamma: f32,
+        prevl: f32,
+        prevr: f32,
+        first: bool,
+    }
 }
 
 impl VertexExt{
@@ -150,11 +156,22 @@ impl VertexExt{
         }
     }
 
+    pub fn loww_pass(cut_off_hz: f32, sampling_hz: usize) -> Self{
+        let gamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * cut_off_hz / sampling_hz as f32);
+        Self::LowPass{
+            gamma,
+            prevl: 0.0,
+            prevr: 0.0,
+            first: true,
+        }
+    }
+
     pub fn set_time(&mut self, time: usize){
         match self{
             Self::SampleLoop { t, .. } => { *t = time; },
             Self::DebugSine { notes, .. } => { notes.clear(); },
             Self::Synth { notes, .. } => { notes.clear(); },
+            Self::LowPass { first, .. } => { *first = true; },
             _ => {  },
         }
     }
@@ -193,6 +210,9 @@ impl VertexExt{
             },
             Self::Adsr { use_off, use_max, conf, note, floww_index, primary, ghost } => {
                 adsr_gen(buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note, primary, ghost);
+            },
+            Self::LowPass { prevl, prevr, gamma, first } => {
+                low_pass_gen(buf, len, wet, *gamma, first, prevl, prevr);
             }
         }
         buf.apply_angle(angle, len);
@@ -211,6 +231,7 @@ impl VertexExt{
             Self::SampSyn { .. } => false,
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
+            Self::LowPass { .. } => true,
         }
     }
 
@@ -551,5 +572,22 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
     }
     primary.0 += len as f32 / sr as f32;
     ghost.0 += len as f32 / sr as f32;
+}
+
+fn low_pass_gen(buf: &mut Sample, len: usize, wet: f32, gamma: f32, first: &mut bool, prevl: &mut f32, prevr: &mut f32){
+    if wet < 0.0001 { return; }
+    if *first {
+        *prevl = buf.l[0];
+        *prevr = buf.r[0];
+        *first = false;
+    }
+    for i in 0..len{
+        let l = *prevl + gamma * (buf.l[i] - *prevl);
+        let r = *prevr + gamma * (buf.r[i] - *prevr);
+        buf.l[i] = l;
+        buf.r[i] = r;
+        *prevl = l;
+        *prevr = r;
+    }
 }
 

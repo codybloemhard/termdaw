@@ -58,9 +58,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes
 - [ ] Better scrolling through time handling of on/off notes
-- [ ] Low pass vertex
-- [ ] High pass vertex
-- [ ] Band pass vertex
+- [ ] Low/High/Band pass vertex
 - [ ] Split vertex
 - [ ] Active toggle on vertices
 - [ ] Inactivate completely dry vertices
