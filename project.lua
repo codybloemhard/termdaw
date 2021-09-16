@@ -43,6 +43,7 @@ add_lv2fx("chorus", 1.0, 0.0, 1.0, "chorus");
 add_lv2fx("reverb", 1.0, 0.0, 0.9, "reverb");
 add_lv2fx("compress", 1.0, 0.0, 1.0, "compressor");
 add_lv2fx("tape", 1.0, 0.0, 1.0, "tape");
+add_bandpass("lp", 1.0, 0.0, 1.0, 200, 2000, false);
 
 add_normalize("sum", 1.0, 0.0);
 
@@ -56,6 +57,7 @@ connect("comp", "chorus");
 connect("chorus", "reverb");
 connect("reverb", "compress");
 connect("compress", "tape");
-connect("tape", "sum");
+connect("tape", "lp");
+connect("lp", "sum");
 
 set_output("sum");

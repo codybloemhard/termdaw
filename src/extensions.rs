@@ -64,11 +64,15 @@ pub enum VertexExt{
         primary: (f32, f32, f32),
         ghost: (f32, f32, f32),
     },
-    LowPass{
-        gamma: f32,
-        prevl: f32,
-        prevr: f32,
+    BandPass{
+        lgamma: f32,
+        hgamma: f32,
+        lprevl: f32,
+        lprevr: f32,
+        hprevl: f32,
+        hprevr: f32,
         first: bool,
+        pass: bool,
     }
 }
 
@@ -156,13 +160,20 @@ impl VertexExt{
         }
     }
 
-    pub fn loww_pass(cut_off_hz: f32, sampling_hz: usize) -> Self{
-        let gamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * cut_off_hz / sampling_hz as f32);
-        Self::LowPass{
-            gamma,
-            prevl: 0.0,
-            prevr: 0.0,
+    pub fn band_pass(cut_off_hz_low: f32, cut_off_hz_hig: f32, pass: bool, sampling_hz: usize) -> Self{
+        let lco = cut_off_hz_low.min(20000.0).max(0.0);
+        let hco = cut_off_hz_hig.min(20000.0).max(0.0);
+        let lgamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * lco / sampling_hz as f32);
+        let hgamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * hco / sampling_hz as f32);
+        Self::BandPass{
+            lgamma,
+            hgamma,
+            lprevl: 0.0,
+            lprevr: 0.0,
+            hprevl: 0.0,
+            hprevr: 0.0,
             first: true,
+            pass,
         }
     }
 
@@ -171,7 +182,7 @@ impl VertexExt{
             Self::SampleLoop { t, .. } => { *t = time; },
             Self::DebugSine { notes, .. } => { notes.clear(); },
             Self::Synth { notes, .. } => { notes.clear(); },
-            Self::LowPass { first, .. } => { *first = true; },
+            Self::BandPass { first, .. } => { *first = true; },
             _ => {  },
         }
     }
@@ -211,8 +222,8 @@ impl VertexExt{
             Self::Adsr { use_off, use_max, conf, note, floww_index, primary, ghost } => {
                 adsr_gen(buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note, primary, ghost);
             },
-            Self::LowPass { prevl, prevr, gamma, first } => {
-                low_pass_gen(buf, len, wet, *gamma, first, prevl, prevr);
+            Self::BandPass { lprevl, lprevr, hprevl, hprevr, lgamma, hgamma, first, pass } => {
+                band_pass_gen(buf, len, wet, first, *pass, *lgamma, *hgamma, lprevl, lprevr, hprevl, hprevr);
             }
         }
         buf.apply_angle(angle, len);
@@ -231,7 +242,7 @@ impl VertexExt{
             Self::SampSyn { .. } => false,
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
-            Self::LowPass { .. } => true,
+            Self::BandPass { .. } => true,
         }
     }
 
@@ -574,20 +585,39 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
     ghost.0 += len as f32 / sr as f32;
 }
 
-fn low_pass_gen(buf: &mut Sample, len: usize, wet: f32, gamma: f32, first: &mut bool, prevl: &mut f32, prevr: &mut f32){
+fn band_pass_gen(buf: &mut Sample, len: usize, wet: f32, first: &mut bool, pass: bool,
+        lgamma: f32, hgamma: f32,
+        lprevl: &mut f32, lprevr: &mut f32, hprevl: &mut f32, hprevr: &mut f32){
     if wet < 0.0001 { return; }
+    let lmul = if lgamma == 0.0 { 0.0 } else { 1.0 };
+    let hmul = if hgamma == 0.0 { 0.0 } else { 1.0 };
+    let pass_mul = if pass { 1.0 } else { 0.0 };
+    let cut_mul = 1.0 - pass_mul;
+
     if *first {
-        *prevl = buf.l[0];
-        *prevr = buf.r[0];
+        *lprevl = buf.l[0];
+        *lprevr = buf.r[0];
+        *hprevl = buf.l[0];
+        *hprevr = buf.r[0];
         *first = false;
     }
     for i in 0..len{
-        let l = *prevl + gamma * (buf.l[i] - *prevl);
-        let r = *prevr + gamma * (buf.r[i] - *prevr);
-        buf.l[i] = l;
-        buf.r[i] = r;
-        *prevl = l;
-        *prevr = r;
+        let l = buf.l[i];
+        let r = buf.r[i];
+        let ll = *lprevl + lgamma * (l - *lprevl);
+        let lr = *lprevr + lgamma * (r - *lprevr);
+        let hl = *hprevl + hgamma * (l - *hprevl);
+        let hr = *hprevr + hgamma * (r - *hprevr);
+        *lprevl = ll;
+        *lprevr = lr;
+        *hprevl = hl;
+        *hprevr = hr;
+        let cutl = (lmul * ll + hmul * (l - hl)) * 0.5;
+        let cutr = (lmul * lr + hmul * (r - hr)) * 0.5;
+        let passl = l - cutl;
+        let passr = r - cutl;
+        buf.l[i] = cutl * cut_mul + passl * pass_mul;
+        buf.r[i] = cutr * cut_mul + passr * pass_mul;
     }
 }
 

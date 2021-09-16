@@ -59,6 +59,7 @@ impl State{
         vecs!(
             new_samples, new_resources, new_lv2plugins, new_lv2params, midis,
             sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, sampsyns, lv2fxs, adsrs,
+            bandpasses,
             edges
         );
 
@@ -127,6 +128,8 @@ impl State{
             seed!("add_lv2fx", (String, f32, f32, f32, String), lv2fxs);
                 // add_adsr(name, gain, angle, wet, floww, use_off, note, adsr_conf)
             seed!("add_adsr", (String, f32, f32, f32, String, bool, bool, i32, Vec<f32>), adsrs);
+                // add_bandpass(name, gain, angle, wet, cut_off_hz_low, cut_off_hz_high, pass)
+            seed!("add_bandpass", (String, f32, f32, f32, f32, f32, bool), bandpasses);
                 // connect(name, name)
             seed!("connect", (String, String), edges);
             // ---- Output
@@ -346,6 +349,11 @@ impl State{
                 panic!("ADSR config must have 6 or 9 elements");
             };
             self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, *use_max, conf, note, floww)), name.to_owned());
+        }
+        for (name, gain, angle, wet, cut_off_hz_low, cut_off_hz_high, pass) in &bandpasses {
+            self.g.add(Vertex::new(bl, *gain, *angle, *wet,
+                    VertexExt::band_pass(*cut_off_hz_low, *cut_off_hz_high, *pass, psr)),
+                name.to_owned());
         }
 
         for (a, b) in &edges { self.g.connect(a, b); }
