@@ -589,6 +589,7 @@ fn band_pass_gen(buf: &mut Sample, len: usize, wet: f32, first: &mut bool, pass:
         lgamma: f32, hgamma: f32,
         lprevl: &mut f32, lprevr: &mut f32, hprevl: &mut f32, hprevr: &mut f32){
     if wet < 0.0001 { return; }
+    if lgamma == 0.0 && hgamma == 0.0 { return; }
     let lmul = if lgamma == 0.0 { 0.0 } else { 1.0 };
     let hmul = if hgamma == 0.0 { 0.0 } else { 1.0 };
     let pass_mul = if pass { 1.0 } else { 0.0 };

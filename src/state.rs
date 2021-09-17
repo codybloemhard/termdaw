@@ -167,6 +167,19 @@ impl State{
             (adds, removes)
         }
 
+        macro_rules! do_excluding{
+            ($to_exclude:expr, $new:expr, $cur:expr) => {
+                if !$to_exclude.is_empty(){
+                    for name in $to_exclude{
+                        $new.retain(|i| i.0 != name);
+                    }
+                    $cur = $new;
+                    return;
+                }
+                $cur = $new;
+            };
+        }
+
         // samples may be long, try not to reallocate to much shit
         let (pos, neg) = diff(&self.cur_samples, &new_samples);
         for (name, _) in neg {
@@ -175,13 +188,16 @@ impl State{
         }
         println!("{}Status: refreshing sample bank.", UC::Std);
         self.sb.refresh();
+        let mut to_exclude = Vec::new();
         for (name, file) in pos {
             println!("{}Status: adding sample {}\"{}\"{} to the sample bank.", UC::Std, UC::Blue, name, UC::Std);
-            if let Err(msg) = self.sb.add(name, &file){
+            if let Err(msg) = self.sb.add(name.clone(), &file){
                 println!("{}{}", UC::Red, msg);
-                return;
+                to_exclude.push(name);
             }
         }
+        do_excluding!(to_exclude, new_samples, self.cur_samples);
+
         // Same for resources
         let (pos, neg) = diff(&self.cur_resources, &new_resources);
         for (name, _) in neg {
@@ -190,12 +206,15 @@ impl State{
         }
         println!("{}Status: refreshing resources.", UC::Std);
         self.bb.refresh();
+        let mut to_exclude = Vec::new();
         for (name, file) in pos{
-            if let Err(msg) = self.bb.add(name, &file){
+            if let Err(msg) = self.bb.add(name.clone(), &file){
                 println!("{}{}", UC::Red, msg);
-                return;
+                to_exclude.push(name);
             }
         }
+        do_excluding!(to_exclude, new_resources, self.cur_resources);
+
         // Just reload all midi, so you can easily import newly inplace generated files
         self.fb.reset();
         for (name, file) in midis{
@@ -210,10 +229,11 @@ impl State{
         for (name, _) in neg { // TODO: make plugins removable
             self.host.remove_plugin(&name);
         }
+        let mut to_exclude = Vec::new();
         for (name, uri) in pos {
             if let Err(e) = self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()){
                 println!("{}Couldn't load Lv2 plugin with name: {}\"{}\"{} and uri: {}\"{}\"{}.",
-                        UC::Red, UC::Blue, name, UC::Red, UC::Blue, uri, UC::Red);
+                    UC::Red, UC::Blue, name, UC::Red, UC::Blue, uri, UC::Red);
                 match e{
                     AddPluginError::CapacityReached => {
                         println!("{}\tCapacity reached!", UC::Red);
@@ -227,11 +247,11 @@ impl State{
                     AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
                         println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
                         println!("{}\tAudio inputs: {}{}{}, audio outputs: {}{}",
-                                UC::Red, UC::Blue, ins, UC::Red, UC::Blue, outs);
+                            UC::Red, UC::Blue, ins, UC::Red, UC::Blue, outs);
                     },
                     AddPluginError::MoreThanOneAtomPort(atomports) => {
                         println!("{}\tPlugin has more than one atom ports! Atom ports: {}{}{}.",
-                                UC::Red, UC::Blue, atomports, UC::Red);
+                            UC::Red, UC::Blue, atomports, UC::Red);
                     },
                     AddPluginError::PortNeitherInputOrOutput => {
                         println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
@@ -240,13 +260,12 @@ impl State{
                         println!("{}\tPlugin has a port that is neither control, audio or optional.", UC::Red);
                     },
                 }
-                new_lv2plugins.retain(|i| i.0 != name);
-                self.cur_lv2plugins = new_lv2plugins;
-                return;
+                to_exclude.push(name.clone());
             }
             println!("{}Info: added plugin {}{}{} with uri {}{}{}.",
-                    UC::Std, UC::Blue, name, UC::Std, UC::Blue, uri, UC::Std);
+                UC::Std, UC::Blue, name, UC::Std, UC::Blue, uri, UC::Std);
         }
+        do_excluding!(to_exclude, new_lv2plugins, self.cur_lv2plugins);
 
         // need diff to see what params we need to reset
         let (pos, neg) = diff(&self.cur_lv2params, &new_lv2params);
@@ -256,6 +275,7 @@ impl State{
         for (plugin, name, value) in pos{
             self.host.set_value(&plugin, &name, value);
         }
+        self.cur_lv2params = new_lv2params;
 
         // just rebuild the damn thing, if it becomes problematic i'll do something about it,
         // probably :)
@@ -267,7 +287,7 @@ impl State{
                     Some(i) => i,
                     None => {
                         println!("{}Could not get {} index for vertex {}\"{}\"{}.",
-                                UC::Std, $category, UC::Blue, $name, UC::Std);
+                            UC::Red, $category, UC::Blue, $name, UC::Std);
                         return;
                     }
                 }
@@ -328,7 +348,7 @@ impl State{
             let table = if let Some(t) = parse_wavetable_from_buffer(self.bb.get_buffer(buf_ind)) { t }
             else {
                 println!("{}Could not parse wavetable from resource {}\"{}\"{}, using default table!",
-                        UC::Std, UC::Blue, resource, UC::Std);
+                    UC::Std, UC::Blue, resource, UC::Std);
                 WaveTable::default()
             };
 
@@ -363,11 +383,6 @@ impl State{
             println!("{}TermDaw: graph check failed!", UC::Red);
             return;
         }
-
-        self.cur_samples = new_samples;
-        self.cur_resources = new_resources;
-        self.cur_lv2plugins = new_lv2plugins;
-        self.cur_lv2params = new_lv2params;
 
         self.g.reset_normalize_vertices();
 

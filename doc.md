@@ -114,5 +114,10 @@ You contruct an adsr conf as an array of floats. You can either have 6 or 9 floa
   - use_max: whether to max (true) or min (true) the primary and ghost note values. Choose max if you have a normal envelope and min if you have an inverted one (ie. one that dips in velocity and has a default value of more than zero).
   - note: specific midi note value to trigger on, -1 for all notes
   - adsr_conf: the adsr config to apply on the audio
+- `add_bandpass(name: string, gain: float, angle: float, wet: float, cut_off_hz_low: float, cut_off_hz_high: float, pass: bool);`
+  - wettness: how much of the processed signal is mixed in 0.0 for none and 1.0 for full
+  - cut_off_hz_low: lowpass will let through signal under this hz and will roll off above after it
+  - cut_off_hz_high: highpass will let through signal above this hz and will roll off under it
+  - pass: when true it's a pass, when false it's a cut
 - `connect(a: string, b: string);` Takes two names of vertices and connects them to eachother. The output of a will be the intput for b.
 - 'set_output(out: string);' Takes a name of a vertex and sets this to be the last vertex: the output of this vertex will be the final result.
