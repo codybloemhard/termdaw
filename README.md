@@ -63,6 +63,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Active toggle on vertices
 - [ ] Inactivate completely dry vertices
 - [ ] Prune inactive vertices from the graph
+- [ ] Streaming mode (input through stdin)
 
 ## Failed
 - [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.

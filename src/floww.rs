@@ -1,8 +1,8 @@
-use apres::{ MIDI };
-use apres::MIDIEvent::{ NoteOn, NoteOff, SetTempo };
 use term_basics_linux::UC;
 
 use std::collections::{ HashMap };
+
+use ::floww::{ Floww, read_floww_from_midi };
 
 #[derive(Default)]
 pub struct FlowwBank{
@@ -29,8 +29,7 @@ impl FlowwBank{
     }
 
     pub fn add_floww(&mut self, name: String, path: &str) -> Result<(), String>{
-        if let Ok(midi) = MIDI::from_path(path){
-            let floww = mono_midi_to_floww(midi, self.sr);
+        if let Ok(floww) = read_floww_from_midi(path){
             self.flowws.push(floww);
             self.start_indices.push(0);
             self.names.insert(name, self.flowws.len() - 1);
@@ -49,8 +48,8 @@ impl FlowwBank{
         for (i, floww) in self.flowws.iter().enumerate(){
             let skip = if do_skip{ self.start_indices[i] }
             else { 0 };
-            for (j, (frame, _, _, _)) in floww.iter().enumerate().skip(skip){
-                if frame >= &t_frame{
+            for (j, (_, t, _, _)) in floww.iter().enumerate().skip(skip){
+                if ((t * self.sr as f32) as usize) >= t_frame{
                     self.start_indices[i] = j;
                     break;
                 }
@@ -82,11 +81,11 @@ impl FlowwBank{
             }
             let next_event = self.flowws[index][self.block_index];
             // this skips events when multiple on values are in the same time frame
-            if next_event.0 < self.frame + offset_frame{
+            if ((next_event.1 * self.sr as f32) as usize) < self.frame + offset_frame{
                 self.block_index += 1;
                 continue;
             }
-            if next_event.0 == self.frame + offset_frame{
+            if ((next_event.1 * self.sr as f32) as usize) == self.frame + offset_frame{
                 self.block_index += 1;
                 // Only send through if it's a hit, ignore note off's
                 if next_event.3 > 0.001{
@@ -107,7 +106,7 @@ impl FlowwBank{
                 break;
             }
             let next_event = self.flowws[index][self.block_index];
-            if next_event.0 == self.frame + offset_frame{
+            if ((next_event.1 * self.sr as f32) as usize) == self.frame + offset_frame{
                 self.block_index += 1;
                 let on = next_event.3 > 0.001;
                 res.push((on, next_event.2, next_event.3));
@@ -121,32 +120,5 @@ impl FlowwBank{
     // returns Vec<(note, vel)>
     // pub fn get_block_continuous(&mut self, index: usize, offset_frame: usize) -> Vec<(f32, f32)>{
     // }
-}
-
-// (frame, id, note, vel)
-pub type Point = (usize, usize, f32, f32);
-pub type Floww = Vec<Point>;
-
-fn mono_midi_to_floww(midi: MIDI, sr: usize) -> Floww{
-    let ppqn = midi.get_ppqn() as f32;
-    let mut time_mult = 1.0; // 60bpm per default
-    let mut floww = Vec::new();
-    for track in midi.get_tracks(){
-        let mut time = 0.0;
-        for (tick, id) in track{
-            time += tick as f32 / ppqn * time_mult * sr as f32;
-            let ev = midi.get_event(id);
-            if let Some(NoteOn(_, note, vel)) = ev {
-                floww.push((time as usize, note as usize, note as f32, vel as f32 / 127.0));
-            }
-            else if let Some(NoteOff(_, note, _)) = ev {
-                floww.push((time as usize, note as usize, note as f32, 0.0));
-            }
-            else if let Some(SetTempo(t)) = ev {
-                time_mult = t as f32 / 1_000_000.0;
-            }
-        }
-    }
-    floww
 }
 
