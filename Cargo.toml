@@ -11,11 +11,11 @@ mlua = { version = "0.5", features = ["lua53", "vendored"] }
 hound = "3.4.0"
 rubato = "0.8.1"
 toml = "0.5.8"
-serde = { version = "1.0.125", features = ["derive"] }
+serde = { version = "1.0.130", features = ["derive"] }
 skim = "0.9.4"
 sdl2 = "0.34.5"
 lv2-host-minimal = "0.1.2"
 term-basics-linux = "0.5.7"
 fnrs = "0.1.6"
 sampsyn = "0.1.2"
-floww = "0.1.1"
+floww = "0.1.10"
