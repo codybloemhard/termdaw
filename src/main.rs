@@ -16,6 +16,7 @@ mod config;
 mod state;
 mod bufferbank;
 mod ui_workflow;
+mod stream_workflow;
 
 use sample::*;
 use graph::*;
@@ -24,30 +25,9 @@ use config::*;
 use state::*;
 use bufferbank::*;
 use ui_workflow::*;
-
-// use std::io::{ self };
-// use ::floww::*;
-// use std::collections::HashMap;
+use stream_workflow::*;
 
 fn main(){
-    // let mut tracks = vec![vec![]; 4];
-    // let map: HashMap<String, usize> = [
-    //     ("ride".to_string(), 0),
-    //     ("hihat".to_string(), 1),
-    //     ("kick".to_string(), 2),
-    //     ("snare".to_string(), 3)
-    // ].iter().cloned().collect();
-    //
-    // loop{
-    //     if let Ok(res) = io::stdin().lock().decoded(){
-    //         let msgs = unpacket(&mut tracks, &map, res);
-    //         println!("MSGS: {:?}", msgs);
-    //         println!("TRACKS: {:?}", tracks);
-    //     } else {
-    //         println!("OOF AUW RIP");
-    //     }
-    // }
-
     let config = Config::read("project.toml");
 
     println!("{}TermDaw: loading {}\"{}\"{} with \n\tbuffer_length = {}{}{} \n\tproject_samplerate = {}{}{} \n\tmain = {}\"{}\"{}",
@@ -124,6 +104,7 @@ fn main(){
         }
     };
 
-    run_ui_workflow(proj_sr, buffer_len, state, device);
+    // run_ui_workflow(proj_sr, buffer_len, state, device);
+    run_stream_workflow(proj_sr, buffer_len, state, device);
 }
 
