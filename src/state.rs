@@ -57,7 +57,7 @@ impl State{
         }
 
         vecs!(
-            new_samples, new_resources, new_lv2plugins, new_lv2params, midis,
+            new_samples, new_resources, new_lv2plugins, new_lv2params, midis, streams,
             sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, sampsyns, lv2fxs, adsrs,
             bandpasses,
             edges
@@ -102,6 +102,8 @@ impl State{
             seed!("load_resource", (String, String), new_resources);
                 // load_midi(name, file)
             seed!("load_midi_floww", (String, String), midis);
+                // declare_stream(name)
+            seed!("declare_stream", (String), streams);
                 // load_lv2(name, uri)
             seed!("load_lv2", (String, String), new_lv2plugins);
                 // parameter(plugin, name, value)
@@ -223,6 +225,10 @@ impl State{
                 return;
             }
         }
+        for (name) in streams{
+            self.fb.declare_stream(name);
+        }
+
         // Also don't recreate plugins
         // TODO: make renaming possible
         let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);

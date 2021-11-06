@@ -27,15 +27,15 @@ parameter("compressor", "Ratio", 2.0);
 
 load_resource("testtable", "/home/cody/git/sampsyn/table");
 
-add_sample_lerp("kick", 2.0, 0.0, "kick", "bassd", -1, 40);
-add_sample_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
+add_sample_lerp("kick", 5.0, 0.0, "kick", "bassd", -1, 40);
+add_sample_lerp("snare", 0.9, 0.0, "snare", "snare", -1, 40);
 add_sample_lerp("hihat", 0.3, 50.0, "hihat", "hihat", -1, 40);
 add_sample_lerp("ride", 0.3, -50.0, "ride", "ride", -1, 40);
 
 hit_adsr = { 0.001, 0.02, 0.0, 0.0, 0.0, 0.0 };
 note_adsr = { 0.01, 0.1, 0.8, 5.0, 0.2, 0.5 };
 std_adsr = { 0.01, 1.0, 1.0, 1.0, 1.0, 0.4 };
-add_synth("bass", 0.3, 0.0, "bass", 0.4, 0.3, hit_adsr, 1.0, 0.8, note_adsr, 0.0, {});
+add_synth("bass", 0.35, 0.0, "bass", 0.4, 0.3, hit_adsr, 1.0, 0.8, note_adsr, 0.0, {});
 --add_synth("comp", 0.5, 0.0, "comping", 0.5, 0.2, hit_adsr, 1.0, 0.7, note_adsr, 0.0, {});
 add_sampsyn("comp", 0.2, 0.0, "comping", std_adsr, "testtable");
 
@@ -44,16 +44,18 @@ add_lv2fx("reverb", 1.0, 0.0, 0.9, "reverb");
 add_lv2fx("compress", 1.0, 0.0, 1.0, "compressor");
 add_lv2fx("tape", 1.0, 0.0, 1.0, "tape");
 add_bandpass("band", 1.0, 0.0, 1.0, 1000, 0, true);
+add_bandpass("kickband", 1.0, 0.0, 1.0, 0, 50, true)
 
 add_normalize("sum", 1.0, 0.0);
 
-connect("kick", "compress");
+connect("kick", "kickband");
 connect("snare", "compress");
 connect("hihat", "reverb");
 connect("ride", "reverb");
-connect("bass", "chorus");
+connect("bass", "reverb");
 connect("comp", "chorus");
 
+connect("kickband", "compress");
 connect("chorus", "reverb");
 connect("reverb", "compress");
 connect("compress", "tape");

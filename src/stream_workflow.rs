@@ -21,24 +21,14 @@ pub fn run_stream_workflow(proj_sr: usize, buffer_len: usize, state: State, devi
 
 #[derive(PartialEq)]
 enum StreamThreadMsg{
-    None, Quit, Stop, Play, Feed(Vec<Vec<Point>>),
+    None, Quit, Stop, Play, Feed(Vec<FlowwPacket>),
 }
 
 fn launch_stream_thread(transmit_to_main: mpsc::Sender<StreamThreadMsg>){
     thread::spawn(move || {
-        let mut tracks = vec![vec![]; 4];
-        let map: HashMap<String, usize> = [
-            ("ride".to_string(), 0),
-            ("hihat".to_string(), 1),
-            ("kick".to_string(), 2),
-            ("snare".to_string(), 3)
-        ].iter().cloned().collect();
-
         loop{
             if let Ok(res) = io::stdin().lock().decoded(){
-                let msgs = unpacket(&mut tracks, &map, res);
-                println!("MSGS: {:?}", msgs);
-                println!("TRACKS: {:?}", tracks);
+                transmit_to_main.send(StreamThreadMsg::Feed(res)).unwrap();
             } else {
                 println!("OOF AUW RIP");
             }
@@ -66,12 +56,10 @@ fn stream_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_s
                 StreamThreadMsg::Quit => {
                     break;
                 },
-                StreamThreadMsg::Feed(data) => {
+                StreamThreadMsg::Feed(packets) => {
                     check_loaded!({
-                        // device.clear();
-                        // device.pause();
-                        // playing = false;
-                        // state.render();
+                        state.fb.trim_streams();
+                        let _msgs = state.fb.append_streams(packets);
                     });
                 },
                 StreamThreadMsg::Play => {

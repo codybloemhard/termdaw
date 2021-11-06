@@ -2,7 +2,7 @@ use term_basics_linux::UC;
 
 use std::collections::{ HashMap };
 
-use ::floww::{ Floww, read_floww_from_midi };
+use ::floww::{ Floww, read_floww_from_midi, FlowwPacket, unpacket };
 
 #[derive(Default)]
 pub struct FlowwBank{
@@ -13,6 +13,7 @@ pub struct FlowwBank{
     flowws: Vec<Floww>,
     start_indices: Vec<usize>,
     names: HashMap<String, usize>,
+    stream_list: Vec<usize>,
 }
 
 impl FlowwBank{
@@ -26,17 +27,40 @@ impl FlowwBank{
         self.flowws.clear();
         self.start_indices.clear();
         self.names.clear();
+        self.stream_list.clear();
+    }
+
+    fn declare_floww(&mut self, name: String, floww: Floww) -> usize{
+        self.flowws.push(floww);
+        self.start_indices.push(0);
+        let index = self.flowws.len() - 1;
+        self.names.insert(name, index);
+        index
     }
 
     pub fn add_floww(&mut self, name: String, path: &str) -> Result<(), String>{
         if let Ok(floww) = read_floww_from_midi(path){
-            self.flowws.push(floww);
-            self.start_indices.push(0);
-            self.names.insert(name, self.flowws.len() - 1);
+            self.declare_floww(name, floww);
             Ok(())
         } else {
             Err(format!("{}Could not read midi file: {}\"{}\"{}.",
                 UC::Red, UC::Blue, path, UC::Red))
+        }
+    }
+
+    pub fn declare_stream(&mut self, name: String){
+        let index = self.declare_floww(name, vec![]);
+        self.stream_list.push(index);
+    }
+
+    pub fn append_streams(&mut self, packets: Vec<FlowwPacket>) -> Vec<String>{
+        unpacket(&mut self.flowws, &self.names, packets)
+    }
+
+    pub fn trim_streams(&mut self){
+        for index in &self.stream_list{
+            let start_index = self.start_indices[*index];
+            self.flowws[*index].drain(..start_index);
         }
     }
 

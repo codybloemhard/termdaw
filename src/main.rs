@@ -104,7 +104,7 @@ fn main(){
         }
     };
 
-    // run_ui_workflow(proj_sr, buffer_len, state, device);
+    //run_ui_workflow(proj_sr, buffer_len, state, device);
     run_stream_workflow(proj_sr, buffer_len, state, device);
 }
 
