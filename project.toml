@@ -6,3 +6,4 @@ name = "Example Project"
 main = "examples/stream.lua"
 buffer_length = 1024
 project_samplerate = 48000
+workflow = "stream"

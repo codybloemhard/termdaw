@@ -1,16 +1,12 @@
 use crate::state::*;
 
 use term_basics_linux::*;
-use skim::prelude::*;
+use ::floww::*;
 
 use std::thread;
 use std::sync::{ mpsc };
 use std::time::{ Duration, Instant };
-use std::io::{ Cursor };
-
 use std::io::{ self };
-use ::floww::*;
-use std::collections::HashMap;
 
 pub fn run_stream_workflow(proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>){
     let (transmit_to_main, receive_in_main) = mpsc::channel();
@@ -21,16 +17,17 @@ pub fn run_stream_workflow(proj_sr: usize, buffer_len: usize, state: State, devi
 
 #[derive(PartialEq)]
 enum StreamThreadMsg{
-    None, Quit, Stop, Play, Feed(Vec<FlowwPacket>),
+    Play, Feed(Vec<FlowwPacket>),
 }
 
 fn launch_stream_thread(transmit_to_main: mpsc::Sender<StreamThreadMsg>){
     thread::spawn(move || {
+        transmit_to_main.send(StreamThreadMsg::Play).unwrap();
         loop{
             if let Ok(res) = io::stdin().lock().decoded(){
                 transmit_to_main.send(StreamThreadMsg::Feed(res)).unwrap();
             } else {
-                println!("OOF AUW RIP");
+                println!("{}Error: could not decode std input.{}", UC::Red, UC::Std);
             }
         }
     });
@@ -53,13 +50,16 @@ fn stream_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_s
                 }
             }
             match rec{
-                StreamThreadMsg::Quit => {
-                    break;
-                },
+                // StreamThreadMsg::Quit => {
+                //     break;
+                // },
                 StreamThreadMsg::Feed(packets) => {
                     check_loaded!({
                         state.fb.trim_streams();
-                        let _msgs = state.fb.append_streams(packets);
+                        let msgs = state.fb.append_streams(packets);
+                        let t = state.g.get_time();
+                        state.fb.set_time(t);
+                        println!("MSGs: {:?}", msgs);
                     });
                 },
                 StreamThreadMsg::Play => {
@@ -70,11 +70,10 @@ fn stream_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_s
                         device.resume();
                     });
                 },
-                StreamThreadMsg::Stop => {
-                    playing = false;
-                    device.pause();
-                },
-                _ => {}
+                // StreamThreadMsg::Stop => {
+                //     playing = false;
+                //     device.pause();
+                // },
             }
         }
         if playing{
@@ -84,6 +83,8 @@ fn stream_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_s
                 let time_since = since.elapsed().as_millis() as f32;
                 // render half second in advance to be played
                 while time_since > millis_generated - 0.5 {
+                    let t = state.g.get_time();
+                    state.fb.set_time(t);
                     let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                     let chunk = chunk.unwrap();
                     let stream_data = chunk.clone().interleave();

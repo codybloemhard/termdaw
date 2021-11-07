@@ -30,11 +30,25 @@ impl Project{
     }
 }
 
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub enum WorkFlow{ Manual, Stream }
+
+
+impl std::fmt::Display for WorkFlow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self{
+            WorkFlow::Manual => "manual",
+            WorkFlow::Stream => "stream",
+        }.to_string())
+    }
+}
+
 #[derive(Deserialize, Clone)]
 pub struct Settings{
     pub main: String,
     buffer_length: Option<usize>,
     project_samplerate: Option<usize>,
+    workflow: Option<String>,
 }
 
 impl Settings{
@@ -44,6 +58,17 @@ impl Settings{
 
     pub fn project_samplerate(&self) -> usize{
         self.project_samplerate.unwrap_or(44100)
+    }
+
+    pub fn workflow(&self) -> WorkFlow{
+        if let Some(string) = &self.workflow{
+            match string.as_ref() {
+                "stream" => WorkFlow::Stream,
+                _ => WorkFlow::Manual,
+            }
+        } else {
+            WorkFlow::Manual
+        }
     }
 }
 

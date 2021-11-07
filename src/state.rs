@@ -103,7 +103,7 @@ impl State{
                 // load_midi(name, file)
             seed!("load_midi_floww", (String, String), midis);
                 // declare_stream(name)
-            seed!("declare_stream", (String), streams);
+            seed!("declare_stream", String, streams);
                 // load_lv2(name, uri)
             seed!("load_lv2", (String, String), new_lv2plugins);
                 // parameter(plugin, name, value)
@@ -225,7 +225,8 @@ impl State{
                 return;
             }
         }
-        for (name) in streams{
+        for name in streams{
+            println!("{}", name);
             self.fb.declare_stream(name);
         }
 

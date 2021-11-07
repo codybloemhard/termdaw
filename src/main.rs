@@ -30,10 +30,11 @@ use stream_workflow::*;
 fn main(){
     let config = Config::read("project.toml");
 
-    println!("{}TermDaw: loading {}\"{}\"{} with \n\tbuffer_length = {}{}{} \n\tproject_samplerate = {}{}{} \n\tmain = {}\"{}\"{}",
+    println!("{}TermDaw: loading {}\"{}\"{} with \n\tbuffer_length = {}{}{} \n\tproject_samplerate = {}{}{} \n\tworkflow = {}{}{} \n\tmain = {}\"{}\"{}",
         UC::Std, UC::Blue, config.project.name(), UC::Std,
         UC::Blue, config.settings.buffer_length(), UC::Std,
         UC::Blue, config.settings.project_samplerate(), UC::Std,
+        UC::Blue, config.settings.workflow(), UC::Std,
         UC::Blue, config.settings.main, UC::Std);
 
     let mut file = match File::open(&config.settings.main){
@@ -51,6 +52,7 @@ fn main(){
 
     let proj_sr = config.settings.project_samplerate();
     let buffer_len = config.settings.buffer_length();
+    let workflow = config.settings.workflow();
 
     let mut state = State{
         lua: Lua::new(),
@@ -104,7 +106,9 @@ fn main(){
         }
     };
 
-    //run_ui_workflow(proj_sr, buffer_len, state, device);
-    run_stream_workflow(proj_sr, buffer_len, state, device);
+    match workflow{
+        WorkFlow::Manual => run_ui_workflow(proj_sr, buffer_len, state, device),
+        WorkFlow::Stream => run_stream_workflow(proj_sr, buffer_len, state, device),
+    }
 }
 
