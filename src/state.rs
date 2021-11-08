@@ -185,14 +185,16 @@ impl State{
         // samples may be long, try not to reallocate to much shit
         let (pos, neg) = diff(&self.cur_samples, &new_samples);
         for (name, _) in neg {
-            println!("{}Info: sample {}\"{}\"{} will be removed from the sample bank.", UC::Std, UC::Blue, name, UC::Std);
+            println!("{s}Info: sample {b}\"{x}\"{s} will be removed from the sample bank.",
+                    s = UC::Std, b = UC::Blue, x = name);
             self.sb.mark_dead(&name);
         }
         println!("{}Status: refreshing sample bank.", UC::Std);
         self.sb.refresh();
         let mut to_exclude = Vec::new();
         for (name, file) in pos {
-            println!("{}Status: adding sample {}\"{}\"{} to the sample bank.", UC::Std, UC::Blue, name, UC::Std);
+            println!("{s}Status: adding sample {b}\"{x}\"{s} to the sample bank.",
+                    s = UC::Std, b = UC::Blue, x = name);
             if let Err(msg) = self.sb.add(name.clone(), &file){
                 println!("{}{}", UC::Red, msg);
                 to_exclude.push(name);
@@ -203,7 +205,8 @@ impl State{
         // Same for resources
         let (pos, neg) = diff(&self.cur_resources, &new_resources);
         for (name, _) in neg {
-            println!("{}Info: resource {}\"{}\"{} will be removed.", UC::Std, UC::Blue, name, UC::Std);
+            println!("{s}Info: resource {b}\"{x}\"{s} will be removed.",
+                    s = UC::Std, b = UC::Blue, x = name);
             self.bb.mark_dead(&name);
         }
         println!("{}Status: refreshing resources.", UC::Std);
@@ -239,8 +242,8 @@ impl State{
         let mut to_exclude = Vec::new();
         for (name, uri) in pos {
             if let Err(e) = self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()){
-                println!("{}Couldn't load Lv2 plugin with name: {}\"{}\"{} and uri: {}\"{}\"{}.",
-                    UC::Red, UC::Blue, name, UC::Red, UC::Blue, uri, UC::Red);
+                println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
+                    r = UC::Red, b = UC::Blue, n = name, u = uri);
                 match e{
                     AddPluginError::CapacityReached => {
                         println!("{}\tCapacity reached!", UC::Red);
@@ -253,12 +256,12 @@ impl State{
                     },
                     AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
                         println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
-                        println!("{}\tAudio inputs: {}{}{}, audio outputs: {}{}",
-                            UC::Red, UC::Blue, ins, UC::Red, UC::Blue, outs);
+                        println!("{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
+                            r = UC::Red, b = UC::Blue, i = ins, o = outs);
                     },
                     AddPluginError::MoreThanOneAtomPort(atomports) => {
-                        println!("{}\tPlugin has more than one atom ports! Atom ports: {}{}{}.",
-                            UC::Red, UC::Blue, atomports, UC::Red);
+                        println!("{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
+                            r = UC::Red, b = UC::Blue, a = atomports);
                     },
                     AddPluginError::PortNeitherInputOrOutput => {
                         println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
@@ -269,8 +272,8 @@ impl State{
                 }
                 to_exclude.push(name.clone());
             }
-            println!("{}Info: added plugin {}{}{} with uri {}{}{}.",
-                UC::Std, UC::Blue, name, UC::Std, UC::Blue, uri, UC::Std);
+            println!("{s}Info: added plugin {b}{n}{s} with uri {b}{u}{s}.",
+                s = UC::Std, b = UC::Blue, n = name, u = uri);
         }
         do_excluding!(to_exclude, new_lv2plugins, self.cur_lv2plugins);
 
@@ -354,8 +357,8 @@ impl State{
 
             let table = if let Some(t) = parse_wavetable_from_buffer(self.bb.get_buffer(buf_ind)) { t }
             else {
-                println!("{}Could not parse wavetable from resource {}\"{}\"{}, using default table!",
-                    UC::Std, UC::Blue, resource, UC::Std);
+                println!("{s}Could not parse wavetable from resource {b}\"{r}\"{s}, using default table!",
+                    s = UC::Std, b = UC::Blue, r = resource);
                 WaveTable::default()
             };
 
@@ -408,21 +411,21 @@ impl State{
 
         let (msr, mbd) = self.sb.get_max_sr_bd();
         if psr > self.render_sr{
-            println!("{}TermDaw: warning: render will down sample from {}{}{}(project s.r.) to {}{}{}.",
-                UC::Yellow, UC::Blue, psr, UC::Yellow, UC::Blue, self.render_sr, UC::Yellow);
+            println!("{y}TermDaw: warning: render will down sample from {b}{p}{y}(project s.r.) to {b}{r}{y}.",
+                y = UC::Yellow, b = UC::Blue, p = psr, r = self.render_sr);
         }
         if msr > self.render_sr{
-            println!("{}TermDaw: warning: render will down sample from peak input quality({}{}{}) to {}{}{}.",
-                UC::Yellow, UC::Blue, msr, UC::Yellow, UC::Blue, self.render_sr, UC::Yellow);
+            println!("{y}TermDaw: warning: render will down sample from peak input quality({b}{m}{y}) to {b}{r}{y}.",
+                y = UC::Yellow, b = UC::Blue, m = msr, r = self.render_sr);
         }
         if !(self.bd == 8 || self.bd == 16 || self.bd == 24 || self.bd == 32) {
-            println!("{}Bitdepth of {}{}{} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
-                UC::Red, UC::Blue, self.bd, UC::Red);
+            println!("{r}Bitdepth of {b}{bd}{r} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
+                r = UC::Red, b = UC::Blue, bd = self.bd);
             return;
         }
         if mbd > self.bd{
-            println!("{}TermDaw: warning: render will lose bitdepth from peak input quality({}{}{} bits) to {}{}{} bits",
-                UC::Yellow, UC::Blue, mbd, UC::Yellow, UC::Blue, self.bd, UC::Yellow);
+            println!("{y}TermDaw: warning: render will lose bitdepth from peak input quality({b}{m}{y} bits) to {b}{bd}{y} bits",
+                y = UC::Yellow, b = UC::Blue,  m = mbd, bd = self.bd);
         }
         let spec = hound::WavSpec{
             channels: 2,

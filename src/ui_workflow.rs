@@ -166,8 +166,8 @@ fn ui_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_sr: u
                     check_loaded!({
                         let t = state.g.get_time();
                         let tf = t as f32 / proj_sr as f32;
-                        println!("{}Frame: {}{}{}, Time: {}{}",
-                            UC::Std, UC::Blue, t, UC::Std, UC::Blue, tf);
+                        println!("{s}Frame: {b}{t}{s}, Time: {b}{tf}",
+                            s = UC::Std, b = UC::Blue, t = t, tf = tf);
                     });
                 }
                 UiThreadMsg::NormVals => {

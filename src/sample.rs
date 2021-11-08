@@ -19,12 +19,12 @@ impl Sample{
 
     pub fn from(l: Vec<f32>, r: Vec<f32>) -> Result<Self, String>{
         if l.len() != r.len() {
-            return Err(format!("{}TermDaw: Sample::from: l and r do not have the same length: {}{}{} and {}{}{}.",
-                UC::Red, UC::Blue, l.len(), UC::Red, UC::Blue, r.len(), UC::Red));
+            return Err(format!("{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
+                r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()));
         }
         if l.is_empty(){
-            return Err(format!("{}TermDaw: Sample::from: l and r have length {}0{}.",
-                UC::Red, UC::Blue, UC::Red));
+            return Err(format!("{r}TermDaw: Sample::from: l and r have length {b}0{r}.",
+                r = UC::Red, b = UC::Blue));
         }
         Ok(Self{ l, r })
     }
@@ -147,27 +147,27 @@ impl SampleBank{
 
     pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
         if self.names.get(&name).is_some() {
-            return Err(format!("{}TermDaw: SampleBank: there is already a sample with name {}\"{}\"{} present.",
-                UC::Red, UC::Blue, name, UC::Red));
+            return Err(format!("{r}TermDaw: SampleBank: there is already a sample with name {b}\"{n}\"{r} present.",
+                r = UC::Red, b = UC::Blue, n = name));
         }
         let mut reader = if let Ok(reader) = hound::WavReader::open(file){
             reader
         } else {
-            return Err(format!("{}TermDaw: SampleBank: could not open file {}\"{}\"{}.",
-                UC::Red, UC::Blue, file, UC::Red));
+            return Err(format!("{r}TermDaw: SampleBank: could not open file {b}\"{f}\"r{}.",
+                r = UC::Red, b = UC::Blue, f = file));
         };
         let specs = reader.spec();
         if specs.channels != 2 {
-            return Err(format!("{}TermDaw: SampleBank: only stereo samples are supported yet, found {}{}{} channels.",
-                UC::Red, UC::Blue, specs.channels, UC::Red));
+            return Err(format!("{r}TermDaw: SampleBank: only stereo samples are supported yet, found {b}{s}{r} channels.",
+                r = UC::Red, b = UC::Blue, s = specs.channels));
         }
         let sr = specs.sample_rate as usize;
         let bd = specs.bits_per_sample;
         self.max_sr = self.max_sr.max(sr);
         self.max_bd = self.max_bd.max(bd as usize);
         if sr > self.sample_rate {
-            println!("{}TermDaw: warning: sample {}\"{}\"{} has a higher samplerate({}{}{}) than the project({}{}{}).",
-                UC::Yellow, UC::Blue, name, UC::Yellow, UC::Blue, sr, UC::Yellow, UC::Blue, self.sample_rate, UC::Yellow);
+            println!("{y}TermDaw: warning: sample {b}\"{n}\"{y} has a higher samplerate({b}{sr}{y}) than the project({b}{psr}{y}).",
+                y = UC::Yellow, b = UC::Blue, n = name, sr = sr, psr = self.sample_rate);
         }
         let mut l = Vec::new();
         let mut r = Vec::new();

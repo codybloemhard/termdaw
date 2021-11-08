@@ -23,19 +23,19 @@ impl BufferBank{
 
     pub fn add(&mut self, name: String, file_path: &str) -> Result<(), String>{
         if self.names.get(&name).is_some() {
-            return Err(format!("{}TermDaw: BufferBank: there is already a blob with name {}\"{}\"{} present.",
-                UC::Red, UC::Blue, name, UC::Red));
+            return Err(format!("{r}TermDaw: BufferBank: there is already a blob with name {b}\"{n}\"{r} present.",
+                r = UC::Red, b = UC::Blue, n = name));
         }
 
         let mut buffer = Vec::new();
         let mut file = if let Ok(file) = File::open(file_path) { file }
         else {
-            return Err(format!("{}TermDaw: BufferBank: could open read file {}\"{}\"{}.",
-                UC::Red, UC::Blue, file_path, UC::Red));
+            return Err(format!("{r}TermDaw: BufferBank: could open read file {b}\"{f}\"{r}.",
+                r = UC::Red, b = UC::Blue, f = file_path));
         };
         if file.read_to_end(&mut buffer).is_err() {
-            return Err(format!("{}TermDaw: BufferBank: could not read file {}\"{}\"{}.",
-                UC::Red, UC::Blue, file_path, UC::Red));
+            return Err(format!("{r}TermDaw: BufferBank: could not read file {b}\"{f}\"{r}.",
+                r = UC::Red, b = UC::Blue, f = file_path));
         }
 
         self.buffers.push(buffer);

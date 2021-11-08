@@ -30,18 +30,19 @@ use stream_workflow::*;
 fn main(){
     let config = Config::read("project.toml");
 
-    println!("{}TermDaw: loading {}\"{}\"{} with \n\tbuffer_length = {}{}{} \n\tproject_samplerate = {}{}{} \n\tworkflow = {}{}{} \n\tmain = {}\"{}\"{}",
-        UC::Std, UC::Blue, config.project.name(), UC::Std,
-        UC::Blue, config.settings.buffer_length(), UC::Std,
-        UC::Blue, config.settings.project_samplerate(), UC::Std,
-        UC::Blue, config.settings.workflow(), UC::Std,
-        UC::Blue, config.settings.main, UC::Std);
+    println!("{s}TermDaw: loading {b}\"{x}\"{s} with \n\tbuffer_length = {b}{y}{s} \n\tproject_samplerate = {b}{z}{s} \n\tworkflow = {b}{w}{s} \n\tmain = {b}\"{v}\"{s}",
+        s = UC::Std, b = UC::Blue,
+        x = config.project.name(),
+        y = config.settings.buffer_length(),
+        z = config.settings.project_samplerate(),
+        w = config.settings.workflow(),
+        v = config.settings.main);
 
     let mut file = match File::open(&config.settings.main){
         Ok(f) => f,
         Err(e) => {
-            println!("{}Error: could not open main lua file: {}\"{}\"{}.",
-                UC::Red, UC::Blue, config.settings.main, UC::Red);
+            println!("{r}Error: could not open main lua file: {b}\"{x}\"{r}.",
+                r = UC::Red, b = UC::Blue, x = config.settings.main);
             println!("{}\t{}", UC::Red, e);
             return;
         }

@@ -79,13 +79,13 @@ impl Graph{
         let a_res = self.name_map.get(a);
         let b_res = self.name_map.get(b);
         if a_res.is_none() {
-            println!("{}TermDaw: warning: vertex {}\"{}\"{} cannot be found and thus can't be connected.",
-                UC::Yellow, UC::Blue, a, UC::Yellow);
+            println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} cannot be found and thus can't be connected.",
+                y = UC::Yellow, b = UC::Blue, x = a);
             return false;
         }
         if b_res.is_none() {
-            println!("{}TermDaw: warning: vertex {}\"{}\"{} cannot be found and thus can't be connected to.",
-                UC::Yellow, UC::Blue, b, UC::Yellow);
+            println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} cannot be found and thus can't be connected to.",
+                y = UC::Yellow, b = UC::Blue, x = b);
             return false;
         }
         let a_index = *a_res.unwrap();
@@ -159,8 +159,8 @@ impl Graph{
         find_connected_component(output, &self.edges, &mut set);
         for (i, x) in set.into_iter().enumerate(){
             if x { continue; }
-            println!("{}TermDaw: warning: vertex {}\"{}\"{} does not reach output.",
-                UC::Yellow, UC::Blue, self.names[i], UC::Yellow);
+            println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} does not reach output.",
+                y = UC::Yellow, b = UC::Blue, x = self.names[i]);
         }
         true
     }

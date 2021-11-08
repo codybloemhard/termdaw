@@ -43,8 +43,8 @@ impl FlowwBank{
             self.declare_floww(name, floww);
             Ok(())
         } else {
-            Err(format!("{}Could not read midi file: {}\"{}\"{}.",
-                UC::Red, UC::Blue, path, UC::Red))
+            Err(format!("{r}Could not read midi file: {b}\"{x}\"{r}.",
+                r = UC::Red, b = UC::Blue, x = path))
         }
     }
 

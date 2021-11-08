@@ -10,8 +10,8 @@ declare_stream("snare");
 
 add_sample_lerp("kick", 1.0, 0.0, "kick", "kick", -1, 40);
 add_sample_lerp("snare", 1.0, 0.0, "snare", "snare", -1, 40);
-add_sample_lerp("hihat", 3.0, 50.0, "hihat", "hihat", -1, 40);
-add_sample_lerp("ride", 1.0, -50.0, "ride", "ride", -1, 40);
+add_sample_lerp("hihat", 3.0, 0.0, "hihat", "hihat", -1, 40);
+add_sample_lerp("ride", 1.0, 0.0, "ride", "ride", -1, 40);
 
 add_normalize("sum", 1.0, 0.0);
 

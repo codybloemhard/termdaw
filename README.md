@@ -8,12 +8,14 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
     - Any samplerate: will up or down sample from project rate
     - 8, 16, 24 or 32 bit bitdepth
   - [x] Play back audio
-- Terminal UX
+- Terminal UX Workflow
   - [x] Controls: play, pause, stop
   - [x] Controls: set/get time, dash in time
   - [x] Controls: refresh, render
   - [x] View: Terminal logging, warnings, errors, colors
   - [x] Toml configuration
+- Streaming Workflow
+  - [x] Streaming mode (input through stdin)
 - Structure
   - [x] Sample Bank
   - [x] Floww Bank
@@ -30,11 +32,16 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Sample multi vertex
   - [x] Sample lerp vertex
   - [x] Lv2 fx vertex
+  - [ ] Lv2 midi instrument vertex
   - [x] Debug Sine synth vertex
   - [x] Simple synth vertex
   - [x] Wavetable synth vertex
+  - [x] Band pass/cut vertex
 - Floww
   - [x] Read from midi
+  - [ ] Read floww from floww description
+  - [x] Read binary floww from stdin stream
+  - [ ] Read human readable floww from stdin stream
 - Lua
   - [x] To configure the project (sample rate, etc)
   - [x] Load resources (samples and plugins)
@@ -53,17 +60,13 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [ ] Floww type
   - [ ] Value type
 - [ ] Value automation
-- [ ] Lv2 midi instrument vertex
 - [ ] Lufs mastering tool
-- [ ] Read floww from floww description
 - [ ] Linear interpolation of floww notes
 - [ ] Better scrolling through time handling of on/off notes
-- [x] Band pass/cut vertex
 - [ ] Split vertex
 - [ ] Active toggle on vertices
 - [ ] Inactivate completely dry vertices
 - [ ] Prune inactive vertices from the graph
-- [ ] Streaming mode (input through stdin)
 
 ## Failed
 - [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.
