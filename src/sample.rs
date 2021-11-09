@@ -17,16 +17,34 @@ impl Sample{
         }
     }
 
-    pub fn from(l: Vec<f32>, r: Vec<f32>) -> Result<Self, String>{
-        if l.len() != r.len() {
-            return Err(format!("{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
-                r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()));
+    pub fn from(l: Vec<f32>, r: Vec<f32>, method: SampleLoadMethod) -> Result<Self, String>{
+        match method{
+            SampleLoadMethod::Left => {
+                if l.is_empty(){
+                    return Err(format!("{r}TermDaw: Sample::from: l has length {b}0{r}.",
+                        r = UC::Red, b = UC::Blue));
+                }
+                Ok(Self { l: l.clone(), r: l })
+            },
+            SampleLoadMethod::Right => {
+                if r.is_empty(){
+                    return Err(format!("{r}TermDaw: Sample::from: r has length {b}0{r}.",
+                        r = UC::Red, b = UC::Blue));
+                }
+                Ok(Self { l: r.clone(), r })
+            },
+            SampleLoadMethod::Stereo => {
+                if l.len() != r.len() {
+                    return Err(format!("{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
+                        r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()));
+                }
+                if l.is_empty(){
+                    return Err(format!("{r}TermDaw: Sample::from: l and r have length {b}0{r}.",
+                        r = UC::Red, b = UC::Blue));
+                }
+                Ok(Self{ l, r })
+            }
         }
-        if l.is_empty(){
-            return Err(format!("{r}TermDaw: Sample::from: l and r have length {b}0{r}.",
-                r = UC::Red, b = UC::Blue));
-        }
-        Ok(Self{ l, r })
     }
 
     pub fn len(&self) -> usize{
@@ -133,6 +151,19 @@ pub struct SampleBank{
     marked: HashSet<usize>,
 }
 
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub enum SampleLoadMethod{ Stereo, Left, Right }
+
+impl SampleLoadMethod{
+    pub fn from(string: &str) -> Self{
+        match string{
+            "left" => SampleLoadMethod::Left,
+            "right" => SampleLoadMethod::Right,
+            _ => SampleLoadMethod::Stereo,
+        }
+    }
+}
+
 impl SampleBank{
     pub fn new(sample_rate: usize) -> Self{
         Self{
@@ -145,7 +176,7 @@ impl SampleBank{
         }
     }
 
-    pub fn add(&mut self, name: String, file: &str) -> Result<(), String>{
+    pub fn add(&mut self, name: String, file: &str, method: SampleLoadMethod) -> Result<(), String>{
         if self.names.get(&name).is_some() {
             return Err(format!("{r}TermDaw: SampleBank: there is already a sample with name {b}\"{n}\"{r} present.",
                 r = UC::Red, b = UC::Blue, n = name));
@@ -157,7 +188,7 @@ impl SampleBank{
                 r = UC::Red, b = UC::Blue, f = file));
         };
         let specs = reader.spec();
-        if specs.channels != 2 {
+        if specs.channels != 2 && method == SampleLoadMethod::Stereo{
             return Err(format!("{r}TermDaw: SampleBank: only stereo samples are supported yet, found {b}{s}{r} channels.",
                 r = UC::Red, b = UC::Blue, s = specs.channels));
         }
@@ -198,7 +229,7 @@ impl SampleBank{
                 }
             }
         }
-        let mut sample = match Sample::from(l, r){
+        let mut sample = match Sample::from(l, r, method){
             Ok(sample) => { sample },
             Err(e) => { return Err(e); }
         };

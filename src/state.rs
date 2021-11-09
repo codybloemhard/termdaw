@@ -32,7 +32,7 @@ pub struct State{
     pub bd: usize,
     pub output_vertex: String,
     pub output_file: String,
-    pub cur_samples: Vec<(String, String)>,
+    pub cur_samples: Vec<(String, String, String)>,
     pub cur_resources: Vec<(String, String)>,
     pub cur_lv2plugins: Vec<(String, String)>,
     pub cur_lv2params: Vec<(String, String, f32)>,
@@ -97,7 +97,7 @@ impl State{
             setter!("set_output_file", String, output_file);
             // ---- Resources
                 // load_sample(name, file)
-            seed!("load_sample", (String, String), new_samples);
+            seed!("load_sample", (String, String, String), new_samples);
                 // load_resource(name, file)
             seed!("load_resource", (String, String), new_resources);
                 // load_midi(name, file)
@@ -184,7 +184,7 @@ impl State{
 
         // samples may be long, try not to reallocate to much shit
         let (pos, neg) = diff(&self.cur_samples, &new_samples);
-        for (name, _) in neg {
+        for (name, _, _) in neg {
             println!("{s}Info: sample {b}\"{x}\"{s} will be removed from the sample bank.",
                     s = UC::Std, b = UC::Blue, x = name);
             self.sb.mark_dead(&name);
@@ -192,10 +192,10 @@ impl State{
         println!("{}Status: refreshing sample bank.", UC::Std);
         self.sb.refresh();
         let mut to_exclude = Vec::new();
-        for (name, file) in pos {
+        for (name, file, method) in pos {
             println!("{s}Status: adding sample {b}\"{x}\"{s} to the sample bank.",
                     s = UC::Std, b = UC::Blue, x = name);
-            if let Err(msg) = self.sb.add(name.clone(), &file){
+            if let Err(msg) = self.sb.add(name.clone(), &file, SampleLoadMethod::from(&method)){
                 println!("{}{}", UC::Red, msg);
                 to_exclude.push(name);
             }

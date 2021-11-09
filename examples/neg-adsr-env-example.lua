@@ -5,8 +5,8 @@ set_render_bitdepth(16);
 set_output_file("outp.wav");
 
 -- some background sample that loops
-load_sample("background", "/home/cody/temp/bg.wav");
-load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav");
+load_sample("background", "/home/cody/temp/bg.wav", "");
+load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav", "");
 
 load_midi_floww("bassd", "/home/cody/git/music-gen/bassd.midi");
 

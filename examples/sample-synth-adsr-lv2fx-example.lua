@@ -3,8 +3,8 @@ set_render_samplerate(48000);
 set_render_bitdepth(16);
 set_output_file("outp.wav");
 
-load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav");
-load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav");
+load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-1/snare-1-v-9.wav", "");
+load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav", "");
 
 load_midi_floww("bassd", "/home/cody/git/music-gen/bassd.midi");
 load_midi_floww("snare", "/home/cody/git/music-gen/snare.midi");
