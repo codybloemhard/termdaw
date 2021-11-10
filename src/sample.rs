@@ -188,8 +188,12 @@ impl SampleBank{
                 r = UC::Red, b = UC::Blue, f = file));
         };
         let specs = reader.spec();
-        if specs.channels != 2 && method == SampleLoadMethod::Stereo{
-            return Err(format!("{r}TermDaw: SampleBank: only stereo samples are supported yet, found {b}{s}{r} channels.",
+        if method == SampleLoadMethod::Stereo && specs.channels != 2{
+            return Err(format!("{r}TermDaw: SampleBank: only 2 channel samples are supported for stereo samples, found {b}{s}{r} channels.",
+                r = UC::Red, b = UC::Blue, s = specs.channels));
+        }
+        if method != SampleLoadMethod::Stereo && specs.channels > 2{
+            return Err(format!("{r}TermDaw: SampleBank: only 1,2 channel samples are supported for left or right samples, found {b}{s}{r} channels.",
                 r = UC::Red, b = UC::Blue, s = specs.channels));
         }
         let sr = specs.sample_rate as usize;
@@ -200,33 +204,35 @@ impl SampleBank{
             println!("{y}TermDaw: warning: sample {b}\"{n}\"{y} has a higher samplerate({b}{sr}{y}) than the project({b}{psr}{y}).",
                 y = UC::Yellow, b = UC::Blue, n = name, sr = sr, psr = self.sample_rate);
         }
-        let mut l = Vec::new();
-        let mut r = Vec::new();
-        let mut c = 0;
+        let mut linear = Vec::new();
         if specs.sample_format == hound::SampleFormat::Float{
             for s in reader.samples::<f32>(){
                 if s.is_err() { continue; }
-                let s = s.unwrap();
-                if c == 0 {
-                    l.push(s);
-                    c = 1;
-                } else {
-                    r.push(s);
-                    c = 0;
-                }
+                linear.push(s.unwrap());
             }
         } else {
-            let max = ((1 << bd) / 2 - 1) as f32;
+            //let max = ((1 << bd) / 2 - 1) as f32;
             for s in reader.samples::<i32>(){
                 if s.is_err() { continue; }
-                let s = s.unwrap() as f32 / max;
-                if c == 0 {
-                    l.push(s);
-                    c = 1;
-                } else {
-                    r.push(s);
-                    c = 0;
-                }
+                linear.push(s.unwrap() as f32);
+            }
+        }
+        let mut l = Vec::new();
+        let mut r = Vec::new();
+        if specs.channels == 1{
+            if method == SampleLoadMethod::Left{
+                l = linear;
+            } else {
+                r = linear;
+            }
+        } else {
+            let half_len = linear.len() /  2;
+            for i in 0..half_len{
+                l.push(linear[i * 2]);
+                r.push(linear[i * 2 + 1]);
+            }
+            if linear.len() > half_len * 2{
+                l.push(linear[linear.len() - 1]);
             }
         }
         let mut sample = match Sample::from(l, r, method){
