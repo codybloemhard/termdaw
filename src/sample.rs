@@ -33,7 +33,7 @@ impl Sample{
                 }
                 Ok(Self { l: r.clone(), r })
             },
-            SampleLoadMethod::Stereo => {
+            _ => {
                 if l.len() != r.len() {
                     return Err(format!("{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
                         r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()));
@@ -100,6 +100,14 @@ impl Sample{
         let scalar = 1.0 / max;
         self.scale(len, scalar);
     }
+
+    pub fn normalize_seperate(&mut self){
+        let scalel = 1.0 / self.l.iter().fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } });
+        let scaler = 1.0 / self.r.iter().fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } });
+        self.l.iter_mut().for_each(|sample| *sample *= scalel);
+        self.r.iter_mut().for_each(|sample| *sample *= scaler);
+    }
+
     //Not for chunks!
     pub fn resample(&self, from: usize, to: usize) -> Sample{
         // no idea what is means but comes from the example lol
@@ -152,13 +160,14 @@ pub struct SampleBank{
 }
 
 #[derive(Clone,Copy,PartialEq,Eq)]
-pub enum SampleLoadMethod{ Stereo, Left, Right }
+pub enum SampleLoadMethod{ Stereo, Left, Right, Norm }
 
 impl SampleLoadMethod{
     pub fn from(string: &str) -> Self{
         match string{
             "left" => SampleLoadMethod::Left,
             "right" => SampleLoadMethod::Right,
+            "normalize-seperate" => SampleLoadMethod::Norm,
             _ => SampleLoadMethod::Stereo,
         }
     }
@@ -239,7 +248,11 @@ impl SampleBank{
             Ok(sample) => { sample },
             Err(e) => { return Err(e); }
         };
-        sample.normalize(usize::MAX);
+        if method == SampleLoadMethod::Norm{
+            sample.normalize_seperate();
+        } else {
+            sample.normalize(usize::MAX);
+        }
         // resampling
         if sr != self.sample_rate{ // need to resample
             sample = sample.resample(sr, self.sample_rate);

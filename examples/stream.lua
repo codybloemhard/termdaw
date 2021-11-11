@@ -1,7 +1,7 @@
 load_sample("snare", "/home/cody/doc/samples/drumnbass/snare-2-damped/snare-2-dampened-v-2.wav", "left");
 load_sample("kick", "/home/cody/doc/samples/drumnbass/kick/kick-v-9.wav", "left");
 load_sample("hihat", "/home/cody/doc/samples/drumnbass/hi-hats/tight.wav", "left");
-load_sample("ride", "/home/cody/doc/samples/drumnbass/ride/standard.wav", "left");
+load_sample("ride", "/home/cody/doc/samples/drumnbass/ride/standard.wav", "normalize-seperate");
 
 declare_stream("ride");
 declare_stream("hihat");
