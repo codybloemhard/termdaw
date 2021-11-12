@@ -3,6 +3,14 @@ use term_basics_linux::UC;
 
 use std::collections::{ HashMap, HashSet };
 
+fn absmax(samples: &[f32]) -> f32{
+    absmaxlen(samples, std::usize::MAX)
+}
+
+fn absmaxlen(samples: &[f32], len: usize) -> f32{
+    samples.iter().take(len).fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } })
+}
+
 #[derive(Clone)]
 pub struct Sample{
     pub l: Vec<f32>,
@@ -85,8 +93,7 @@ impl Sample{
     }
 
     pub fn scan_max(&self, len: usize) -> f32{
-        let max = self.l.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max });
-        self.r.iter().take(len).map(|s| s.abs()).fold(0.0, |max, s| if s > max { s } else { max }).max(max)
+        absmaxlen(&self.l, len).max(absmaxlen(&self.r, len))
     }
 
     pub fn scale(&mut self, len: usize, scalar: f32){
@@ -102,10 +109,20 @@ impl Sample{
     }
 
     pub fn normalize_seperate(&mut self){
-        let scalel = 1.0 / self.l.iter().fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } });
-        let scaler = 1.0 / self.r.iter().fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } });
+        let scalel = 1.0 / absmax(&self.l);
+        let scaler = 1.0 / absmax(&self.r);
         self.l.iter_mut().for_each(|sample| *sample *= scalel);
         self.r.iter_mut().for_each(|sample| *sample *= scaler);
+    }
+
+    pub fn mix_down(&mut self){
+        let l = std::mem::take(&mut self.l);
+        let r = std::mem::take(&mut self.r);
+        let mut mix = l.into_iter().zip(r.into_iter()).map(|(l,r)| l + r).collect::<Vec<_>>();
+        let scale = 1.0 / absmax(&mix);
+        mix.iter_mut().for_each(|s| *s *= scale);
+        self.l = mix.clone();
+        self.r = mix;
     }
 
     //Not for chunks!
@@ -160,7 +177,7 @@ pub struct SampleBank{
 }
 
 #[derive(Clone,Copy,PartialEq,Eq)]
-pub enum SampleLoadMethod{ Stereo, Left, Right, Norm }
+pub enum SampleLoadMethod{ Stereo, Left, Right, Norm, Mix }
 
 impl SampleLoadMethod{
     pub fn from(string: &str) -> Self{
@@ -168,6 +185,7 @@ impl SampleLoadMethod{
             "left" => SampleLoadMethod::Left,
             "right" => SampleLoadMethod::Right,
             "normalize-seperate" => SampleLoadMethod::Norm,
+            "mix-down" => SampleLoadMethod::Mix,
             _ => SampleLoadMethod::Stereo,
         }
     }
@@ -250,6 +268,8 @@ impl SampleBank{
         };
         if method == SampleLoadMethod::Norm{
             sample.normalize_seperate();
+        } else if method == SampleLoadMethod::Mix{
+            sample.mix_down();
         } else {
             sample.normalize(usize::MAX);
         }
