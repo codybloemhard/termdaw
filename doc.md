@@ -64,7 +64,12 @@ The project itself is configured with
 - `set_length(seconds: float);` Sets the lenght of the render in seconds. You can listen past this point in the daw.
 - `set_render_samplerate(sr: uint);` Sets the samplerate of the render. This is different than the samplerate of the project (internal, playback in daw, etc). You can set the project samplerate in the toml config.
 - `set_output_file(file: string);` Sets the name of the rendered file.
-- `load_sample(name: string, path: string, mode: string);` Load a sample(.wav) found at the given path into the samplebank tagged with a name for further use. Mode is the loading mode, can be left empty for standard. Modes include "left"(copy left channel to right channel), "right"(copy right channel to left channel) or "normalize-seperate" to normalize each channel seperately.
+- `load_sample(name: string, path: string, mode: string);` Load a sample(.wav) found at the given path into the samplebank tagged with a name for further use. Mode is the loading mode, can be left empty for standard. Modes include:
+  - `left`: copy left channel to right channel
+  - `right`: copy right channel to left channel
+  - `loudest`: copy the loudest channel to the less loud channel
+  - `normalize-seperate`: normalize each channel seperately
+  - `mix-down`: sum both channels and copy result to both
 - `load_midi_floww(name: string, path: string);` Load a midi file found at the given path into the flowwbank tagged with a name for further use.
 - `load_lv2(name: string, uri: string);` Load a lv2 fx plugin found with the lv2 plugin URI and tag it with a name for further use. You can find all your lv2 plugins URI's with the cli program `lv2ls`.
 

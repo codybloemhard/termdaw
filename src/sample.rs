@@ -11,6 +11,14 @@ fn absmaxlen(samples: &[f32], len: usize) -> f32{
     samples.iter().take(len).fold(0.0, |max, s| { let a = s.abs(); if a > max { a } else { max } })
 }
 
+fn mean_energy(samples: &[f32]) -> f32{
+    if samples.is_empty() {
+        0.0
+    } else {
+        samples.iter().map(|s| s.abs()).sum::<f32>() / samples.len() as f32
+    }
+}
+
 #[derive(Clone)]
 pub struct Sample{
     pub l: Vec<f32>,
@@ -40,6 +48,15 @@ impl Sample{
                         r = UC::Red, b = UC::Blue));
                 }
                 Ok(Self { l: r.clone(), r })
+            },
+            SampleLoadMethod::Loudest => {
+                let lm = mean_energy(&l);
+                let rm = mean_energy(&r);
+                if lm > rm{
+                    Ok(Self { l: l.clone(), r: l })
+                } else {
+                    Ok(Self { l: r.clone(), r })
+                }
             },
             _ => {
                 if l.len() != r.len() {
@@ -177,13 +194,14 @@ pub struct SampleBank{
 }
 
 #[derive(Clone,Copy,PartialEq,Eq)]
-pub enum SampleLoadMethod{ Stereo, Left, Right, Norm, Mix }
+pub enum SampleLoadMethod{ Stereo, Left, Right, Loudest, Norm, Mix }
 
 impl SampleLoadMethod{
     pub fn from(string: &str) -> Self{
         match string{
             "left" => SampleLoadMethod::Left,
             "right" => SampleLoadMethod::Right,
+            "loudest" => SampleLoadMethod::Loudest,
             "normalize-seperate" => SampleLoadMethod::Norm,
             "mix-down" => SampleLoadMethod::Mix,
             _ => SampleLoadMethod::Stereo,
