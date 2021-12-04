@@ -73,6 +73,7 @@ impl State{
             // ---- Macros
             macro_rules! seed{
                 ($name:expr, $stype:ty, $vec:ident) => {
+                    #[allow(clippy::type_complexity)]
                     self.lua.globals().set($name, scope.create_function_mut(|_, seed: $stype| {
                         $vec.push(seed);
                         Ok(())
@@ -241,7 +242,7 @@ impl State{
         }
         let mut to_exclude = Vec::new();
         for (name, uri) in pos {
-            if let Err(e) = self.host.add_plugin(&uri, name.clone(), std::ptr::null_mut()){
+            if let Err(e) = self.host.add_plugin(&uri, name.clone()){
                 println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
                     r = UC::Red, b = UC::Blue, n = name, u = uri);
                 match e{

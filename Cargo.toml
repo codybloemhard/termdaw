@@ -14,7 +14,7 @@ toml = "0.5.8"
 serde = { version = "1.0.130", features = ["derive"] }
 skim = "0.9.4"
 sdl2 = "0.34.5"
-lv2-host-minimal = "0.1.2"
+lv2-host-minimal = "0.1.4"
 term-basics-linux = "0.5.7"
 fnrs = "0.1.6"
 sampsyn = "0.1.2"

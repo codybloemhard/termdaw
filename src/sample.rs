@@ -19,7 +19,7 @@ fn mean_energy(samples: &[f32]) -> f32{
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default, PartialEq, Debug)]
 pub struct Sample{
     pub l: Vec<f32>,
     pub r: Vec<f32>,
@@ -172,15 +172,6 @@ impl Sample{
             res.push(self.r[i]);
         }
         res
-    }
-}
-
-impl Default for Sample{
-    fn default() -> Self{
-        Self{
-            l: Vec::new(),
-            r: Vec::new(),
-        }
     }
 }
 

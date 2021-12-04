@@ -187,6 +187,7 @@ impl VertexExt{
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, wet: f32,
                     buf: &mut Sample, res: Vec<&Sample>){
         let (t, sr, len, is_scan) = ga;
@@ -304,6 +305,7 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize,
     *t += len;
 }
 
+#[allow(clippy::too_many_arguments)]
 fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize, target_note: Option<usize>){
     let sample = sb.get_sample(sample_index);
     fb.start_block(floww_index);
@@ -338,6 +340,7 @@ fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: 
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, sample_index: usize,
     floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
     let sample = sb.get_sample(sample_index);
@@ -406,6 +409,7 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
             square: &OscConf, topflat: &OscConf, triangle: &OscConf, t: usize, sr: usize){
     let osc_amp_multiplier = 1.0 / (
@@ -472,6 +476,7 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
     notes.retain(|x| x.3 == 0.0 || x.2 <= release_sec);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32, WaveTableState)>,
             adsr: &AdsrConf, wave_table: &WaveTable, sr: usize){
     let amp_multiplier = 1.0 / adsr.max_vel();
@@ -522,12 +527,13 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv
     for i in 0..len{
         let ll = buf.l[i];
         let rr = buf.r[i];
-        let (l, r) = host.apply_plugin(index, (ll, rr));
+        let (l, r) = host.apply(index, [0, 0, 0], (ll, rr));
         buf.l[i] = lerp(ll, l, wet);
         buf.r[i] = lerp(rr, r, wet);
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, use_max: bool, floww_index: usize,
             sr: usize, conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
     if wet < 0.0001 { return; }
@@ -585,6 +591,7 @@ fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off:
     ghost.0 += len as f32 / sr as f32;
 }
 
+#[allow(clippy::too_many_arguments)]
 fn band_pass_gen(buf: &mut Sample, len: usize, wet: f32, first: &mut bool, pass: bool,
         lgamma: f32, hgamma: f32,
         lprevl: &mut f32, lprevr: &mut f32, hprevl: &mut f32, hprevr: &mut f32){
