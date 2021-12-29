@@ -28,6 +28,10 @@ use ui_workflow::*;
 use stream_workflow::*;
 
 fn main(){
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() > 1{
+        std::env::set_current_dir(&args[1]).expect("Error: could not set working directory!");
+    }
     let config = Config::read("project.toml");
 
     println!("{s}TermDaw: loading {b}\"{x}\"{s} with \n\tbuffer_length = {b}{y}{s} \n\tproject_samplerate = {b}{z}{s} \n\tworkflow = {b}{w}{s} \n\tmain = {b}\"{v}\"{s}",
