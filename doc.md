@@ -8,7 +8,8 @@ The config is written as a `.toml` file.
 It is read on startup and can't be refreshed.
 If you change something you have to change termdaw again.
 The config is project wide, you'll have a config for every project.
-The config file is named `project.toml` and TermDaw will look for it in the directory it's been launched in.
+The config file is named `project.toml` and TermDaw will look for it in the directory it's been launched in, if no cli arguments are given.
+You can give one cli argument, a directory, which will become the working directory in which is will look for the .toml file and to which the main lua file is relative.
 
 ### Example
 
@@ -30,6 +31,7 @@ name                    | [project]     | Yes           | String| unnamed
 main                    | [settings]    | No            | String|
 buffer_length           | [settings]    | Yes           | Uint  | 1024
 project_samplerate      | [settings]    | Yes           | Uint  | 44100
+workflow                | [settings]    | Yes           | String| manual
 
 ## Tui
 

@@ -1,10 +1,11 @@
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 use serde::Deserialize;
 
 impl Config{
-    pub fn read(path: &str) -> Self{
+    pub fn read(path: &Path) -> Self{
         let mut file = File::open(path).unwrap();
         let mut contents = String::new();
         file.read_to_string(&mut contents).unwrap();

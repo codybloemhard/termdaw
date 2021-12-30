@@ -16,6 +16,7 @@ use term_basics_linux::*;
 
 use std::fs::File;
 use std::io::Read;
+use std::path::Path;
 
 pub struct State{
     pub lua: Lua,
@@ -36,6 +37,7 @@ pub struct State{
     pub cur_resources: Vec<(String, String)>,
     pub cur_lv2plugins: Vec<(String, String)>,
     pub cur_lv2params: Vec<(String, String, f32)>,
+    pub wdir: String,
 }
 
 impl State{
@@ -44,7 +46,7 @@ impl State{
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
-        let mut file = if let Ok(f) = File::open(&self.config.settings.main) { f }
+        let mut file = if let Ok(f) = File::open(Path::new(&self.wdir).join(&self.config.settings.main)) { f }
         else {
             println!("{}Can't open main lua file!", UC::Red);
             return;

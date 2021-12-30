@@ -1,6 +1,3 @@
-use std::fs::File;
-use std::io::{ Read };
-
 use mlua::prelude::*;
 use sdl2::audio::AudioSpecDesired;
 use lv2hm::Lv2Host;
@@ -27,26 +24,35 @@ use bufferbank::*;
 use ui_workflow::*;
 use stream_workflow::*;
 
+use std::fs::File;
+use std::io::{ Read };
+use std::path::{ Path };
+
 fn main(){
     let args: Vec<String> = std::env::args().collect();
-    if args.len() > 1{
-        std::env::set_current_dir(&args[1]).expect("Error: could not set working directory!");
-    }
-    let config = Config::read("project.toml");
+    let wdir = if args.len() > 1{
+        args[1].to_owned()
+    } else {
+        "./".to_owned()
+    };
+    let wpath = Path::new(&wdir);
+    let config = Config::read(&wpath.join("project.toml"));
 
-    println!("{s}TermDaw: loading {b}\"{x}\"{s} with \n\tbuffer_length = {b}{y}{s} \n\tproject_samplerate = {b}{z}{s} \n\tworkflow = {b}{w}{s} \n\tmain = {b}\"{v}\"{s}",
+    println!("{s}TermDaw: loading {b}\"{x}\"{s} with \n\tbuffer_length = {b}{y}{s} \n\tproject_samplerate = {b}{z}{s} \n\tworkflow = {b}{w}{s} \n\tworkdir = {b}{v}{s} \n\tmain = {b}\"{u}\"{s}",
         s = UC::Std, b = UC::Blue,
         x = config.project.name(),
         y = config.settings.buffer_length(),
         z = config.settings.project_samplerate(),
         w = config.settings.workflow(),
-        v = config.settings.main);
+        v = wdir,
+        u = config.settings.main);
 
-    let mut file = match File::open(&config.settings.main){
+    let main_path = wpath.join(&config.settings.main);
+    let mut file = match File::open(main_path.clone()){
         Ok(f) => f,
         Err(e) => {
-            println!("{r}Error: could not open main lua file: {b}\"{x}\"{r}.",
-                r = UC::Red, b = UC::Blue, x = config.settings.main);
+            println!("{r}Error: could not open main lua file: {b}\"{x:#?}\"{r}.",
+                r = UC::Red, b = UC::Blue, x = main_path);
             println!("{}\t{}", UC::Red, e);
             return;
         }
@@ -78,6 +84,7 @@ fn main(){
         cur_resources: Vec::new(),
         cur_lv2plugins: Vec::new(),
         cur_lv2params: Vec::new(),
+        wdir,
     };
     state.refresh();
 
