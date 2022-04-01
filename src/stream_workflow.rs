@@ -25,9 +25,11 @@ fn launch_stream_thread(transmit_to_main: mpsc::Sender<StreamThreadMsg>){
         transmit_to_main.send(StreamThreadMsg::Play).unwrap();
         loop{
             if let Ok(res) = io::stdin().lock().decoded(){
+                // eprintln!("Got some");
                 transmit_to_main.send(StreamThreadMsg::Feed(res)).unwrap();
             } else {
                 println!("{}Error: could not decode std input.{}", UC::Red, UC::Std);
+                std::process::exit(0x0100);
             }
         }
     });
