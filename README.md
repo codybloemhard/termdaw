@@ -65,8 +65,9 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Better scrolling through time handling of on/off notes
 - [ ] Split vertex
 - [ ] Active toggle on vertices
-- [ ] Inactivate completely dry vertices
-- [ ] Prune inactive vertices from the graph
+- [ ] Disable completely dry vertices
+- [ ] Prune disabled vertices from the graph
+- [ ] Multithreading
 
 ## Failed
 - [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.
@@ -100,4 +101,23 @@ connect("one", "sum");
 connect("two", "sum");
 
 set_output("sum");
+```
+
+## License
+
+```
+Copyright (C) 2022 Cody Bloemhard
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ```

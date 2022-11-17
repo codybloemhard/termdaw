@@ -40,7 +40,7 @@ impl std::fmt::Display for WorkFlow {
         write!(f, "{}", match self{
             WorkFlow::Manual => "manual",
             WorkFlow::Stream => "stream",
-        }.to_string())
+        })
     }
 }
 
