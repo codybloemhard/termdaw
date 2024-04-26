@@ -2,7 +2,7 @@
 name = "Example Project"
 
 [settings]
-#main = "project.lua"
+# main = "examples/sample-project.lua"
 main = "examples/stream.lua"
 buffer_length = 1024
 project_samplerate = 48000

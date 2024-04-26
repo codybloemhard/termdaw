@@ -31,9 +31,9 @@ fn launch_ui_thread(proj_sr: usize, transmit_to_main: mpsc::Sender<UiThreadMsg>,
             let items = item_reader.of_bufread(Cursor::new(input.clone()));
             let selected_items = Skim::run_with(&options, Some(items))
                 .map(|out| out.selected_items)
-                .unwrap_or_else(Vec::new);
+                .unwrap_or_default();
 
-            if let Some(item) = selected_items.get(0){
+            if let Some(item) = selected_items.first(){
                 let command = item.output();
                 println!("{}---- {}", UC::Magenta, command);
                 let tmsg = if command == "quit" { UiThreadMsg::Quit }

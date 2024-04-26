@@ -135,7 +135,7 @@ impl Sample{
     pub fn mix_down(&mut self){
         let l = std::mem::take(&mut self.l);
         let r = std::mem::take(&mut self.r);
-        let mut mix = l.into_iter().zip(r.into_iter()).map(|(l,r)| l + r).collect::<Vec<_>>();
+        let mut mix = l.into_iter().zip(r).map(|(l,r)| l + r).collect::<Vec<_>>();
         let scale = 1.0 / absmax(&mix);
         mix.iter_mut().for_each(|s| *s *= scale);
         self.l = mix.clone();
@@ -220,7 +220,7 @@ impl SampleBank{
         let mut reader = if let Ok(reader) = hound::WavReader::open(file){
             reader
         } else {
-            return Err(format!("{r}TermDaw: SampleBank: could not open file {b}\"{f}\"r{}.",
+            return Err(format!("{r}TermDaw: SampleBank: could not open file {b}\"{f}\"{r}.",
                 r = UC::Red, b = UC::Blue, f = file));
         };
         let specs = reader.spec();
