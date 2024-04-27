@@ -22,7 +22,7 @@ pub struct State{
     pub lua: Lua,
     pub sb: SampleBank,
     pub g: Graph,
-    pub host: Lv2Host,
+    pub host: Option<Lv2Host>,
     pub fb: FlowwBank,
     pub bb: BufferBank,
     pub config: Config,
@@ -239,64 +239,78 @@ impl State{
         // Also don't recreate plugins
         // TODO: make renaming possible
         let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
-        for (name, _) in neg { // TODO: make plugins removable
-            self.host.remove_plugin(&name);
-        }
-        let mut to_exclude = Vec::new();
-        for (name, uri) in pos {
-            if let Err(e) = self.host.add_plugin(&uri, name.clone()){
-                println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
-                    r = UC::Red, b = UC::Blue, n = name, u = uri);
-                match e{
-                    AddPluginError::CapacityReached => {
-                        println!("{}\tCapacity reached!", UC::Red);
-                    },
-                    AddPluginError::WorldIsNull => {
-                        println!("{}\tWorld is null!", UC::Red);
-                    },
-                    AddPluginError::PluginIsNull => {
-                        println!("{}\tPlugin is null!", UC::Red);
-                    },
-                    AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
-                        println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
-                        println!("{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
-                            r = UC::Red, b = UC::Blue, i = ins, o = outs);
-                    },
-                    AddPluginError::MoreThanOneAtomPort(atomports) => {
-                        println!("{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
-                            r = UC::Red, b = UC::Blue, a = atomports);
-                    },
-                    AddPluginError::PortNeitherInputOrOutput => {
-                        println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
-                    },
-                    AddPluginError::PortNeitherControlOrAudioOrOptional => {
-                        println!("{}\tPlugin has a port that is neither control, audio or optional.", UC::Red);
-                    },
-                }
-                to_exclude.push(name.clone());
+        if let Some(host) = &mut self.host{
+            for (name, _) in neg { // TODO: make plugins removable
+                host.remove_plugin(&name);
             }
-            println!("{s}Info: added plugin {b}{n}{s} with uri {b}{u}{s}.",
-                s = UC::Std, b = UC::Blue, n = name, u = uri);
+        } else if !(neg.is_empty() && pos.is_empty()){
+            println!("{}Couldn't remove Lv2 plugins: no Lv2 host instantiated.", UC::Red);
         }
-        do_excluding!(to_exclude, new_lv2plugins, self.cur_lv2plugins);
 
-        // need diff to see what params we need to reset
-        let (pos, neg) = diff(&self.cur_lv2params, &new_lv2params);
-        for (plugin, name, _) in neg { // TODO: make params resetable in Lv2hm
-            self.host.reset_value(&plugin, &name);
+        if !pos.is_empty() && self.host.is_none(){
+            self.host = Some(Lv2Host::new(1000, bl * 2, psr)); // acount for l/r
         }
-        for (plugin, name, value) in pos{
-            self.host.set_value(&plugin, &name, value);
+
+        if let Some(host) = &mut self.host{
+            let mut to_exclude = Vec::new();
+            for (name, uri) in pos {
+                if let Err(e) = host.add_plugin(&uri, name.clone()){
+                    println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
+                        r = UC::Red, b = UC::Blue, n = name, u = uri);
+                    match e{
+                        AddPluginError::CapacityReached => {
+                            println!("{}\tCapacity reached!", UC::Red);
+                        },
+                        AddPluginError::WorldIsNull => {
+                            println!("{}\tWorld is null!", UC::Red);
+                        },
+                        AddPluginError::PluginIsNull => {
+                            println!("{}\tPlugin is null!", UC::Red);
+                        },
+                        AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
+                            println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
+                            println!("{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
+                                r = UC::Red, b = UC::Blue, i = ins, o = outs);
+                        },
+                        AddPluginError::MoreThanOneAtomPort(atomports) => {
+                            println!("{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
+                                r = UC::Red, b = UC::Blue, a = atomports);
+                        },
+                        AddPluginError::PortNeitherInputOrOutput => {
+                            println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
+                        },
+                        AddPluginError::PortNeitherControlOrAudioOrOptional => {
+                            println!("{}\tPlugin has a port that is neither control, audio or optional.", UC::Red);
+                        },
+                    }
+                    to_exclude.push(name.clone());
+                }
+                println!("{s}Info: added plugin {b}{n}{s} with uri {b}{u}{s}.",
+                    s = UC::Std, b = UC::Blue, n = name, u = uri);
+            }
+            do_excluding!(to_exclude, new_lv2plugins, self.cur_lv2plugins);
+
+            // need diff to see what params we need to reset
+            let (pos, neg) = diff(&self.cur_lv2params, &new_lv2params);
+            for (plugin, name, _) in neg { // TODO: make params resetable in Lv2hm
+                host.reset_value(&plugin, &name);
+            }
+            for (plugin, name, value) in pos{
+                host.set_value(&plugin, &name, value);
+            }
+
+            self.cur_lv2params = new_lv2params;
+        } else if !pos.is_empty(){
+            println!("{}Couldn't load Lv2 plugins: Lv2 host failed to init.", UC::Red);
         }
-        self.cur_lv2params = new_lv2params;
 
         // just rebuild the damn thing, if it becomes problematic i'll do something about it,
         // probably :)
         println!("{}Status: rebuilding graph.", UC::Std);
         self.g.reset();
         macro_rules! get_index{
-            ($obj:ident, $arg:expr, $name:expr, $category:expr) => {
-                match self.$obj.get_index($arg){
+            ($obj:expr, $arg:expr, $name:expr, $category:expr) => {
+                match $obj.get_index($arg){
                     Some(i) => i,
                     None => {
                         println!("{}Could not get {} index for vertex {}\"{}\"{}.",
@@ -309,30 +323,30 @@ impl State{
         for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned()); }
         for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::normalize()), name.to_owned()); }
         for (name, gain, angle, sample) in &sampleloops {
-            let index = get_index!(sb, sample, name, "sample");
+            let index = get_index!(self.sb, sample, name, "sample");
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(index)), name.to_owned());
         }
         for (name, gain, angle, sample, floww, note) in &samplemultis {
-            let sample = get_index!(sb, sample, name, "sample");
-            let floww = get_index!(fb, floww, name, "floww");
+            let sample = get_index!(self.sb, sample, name, "sample");
+            let floww = get_index!(self.fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
         }
         for (name, gain, angle, sample, floww, note, lerp_len) in &samplelerps {
-            let sample = get_index!(sb, sample, name, "sample");
-            let floww = get_index!(fb, floww, name, "floww");
+            let sample = get_index!(self.sb, sample, name, "sample");
+            let floww = get_index!(self.fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let lerp_len = (*lerp_len).max(0) as usize;
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
         }
         for (name, gain, angle, floww) in &debugsines {
-            let floww = get_index!(fb, floww, name, "floww");
+            let floww = get_index!(self.fb, floww, name, "floww");
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::debug_sine(floww)), name.to_owned());
         }
         for (name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr) in &synths {
-            let floww = get_index!(fb, floww, name, "floww");
+            let floww = get_index!(self.fb, floww, name, "floww");
             let parse_adsr_conf = |arr| if let Some(config) = build_adsr_conf(arr){
                 config
             } else {
@@ -350,7 +364,7 @@ impl State{
             );
         }
         for (name, gain, angle, floww, adsr_conf, resource) in &sampsyns {
-            let floww = get_index!(fb, floww, name, "floww");
+            let floww = get_index!(self.fb, floww, name, "floww");
 
             let adsr = if let Some(config) = build_adsr_conf(adsr_conf){ config }
             else { panic!("ADSR config must have 6 or 9 elements"); };
@@ -368,12 +382,16 @@ impl State{
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0,
                 VertexExt::sampsyn(floww, adsr, table)), name.to_owned());
         }
-        for (name, gain, angle, wet, plugin) in &lv2fxs {
-            let index = get_index!(host, plugin, name, "plugin");
-            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)), name.to_owned());
+        if let Some(host) = &mut self.host {
+            for (name, gain, angle, wet, plugin) in &lv2fxs {
+                let index = get_index!(host, plugin, name, "plugin");
+                self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)), name.to_owned());
+            }
+        } else if !lv2fxs.is_empty() {
+            println!("{}Couldn't add Lv2 vertices: no Lv2 instance.", UC::Red)
         }
         for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
-            let floww = get_index!(fb, floww, name, "floww");
+            let floww = get_index!(self.fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let conf = if let Some(config) = build_adsr_conf(conf_arr){

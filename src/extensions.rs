@@ -188,7 +188,7 @@ impl VertexExt{
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, gain: f32, angle: f32, wet: f32,
+    pub fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>, gain: f32, angle: f32, wet: f32,
                     buf: &mut Sample, res: Vec<&Sample>){
         let (t, sr, len, is_scan) = ga;
         if self.has_input(){
@@ -522,14 +522,16 @@ fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: us
     notes.retain(|x| x.3 == 0.0 || x.2 <= adsr.release_sec);
 }
 
-fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv2Host){
+fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Option<Lv2Host>){
     if wet < 0.0001 { return; }
-    for i in 0..len{
-        let ll = buf.l[i];
-        let rr = buf.r[i];
-        let (l, r) = host.apply(index, [0, 0, 0], (ll, rr));
-        buf.l[i] = lerp(ll, l, wet);
-        buf.r[i] = lerp(rr, r, wet);
+    if let Some(host) = host {
+        for i in 0..len{
+            let ll = buf.l[i];
+            let rr = buf.r[i];
+            let (l, r) = host.apply(index, [0, 0, 0], (ll, rr));
+            buf.l[i] = lerp(ll, l, wet);
+            buf.r[i] = lerp(rr, r, wet);
+        }
     }
 }
 

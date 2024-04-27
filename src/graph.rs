@@ -93,7 +93,7 @@ impl Graph{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, t: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, index: usize, is_scan: bool){
+    fn run_vertex(&mut self, t: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>, index: usize, is_scan: bool){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
@@ -102,7 +102,7 @@ impl Graph{
             self.run_vertex(t, sb, fb, host, *incoming, is_scan);
         }
         // Vertex buffers exist as long at the graph exists: we never delete vertices
-        // Safe: we mutate vertex A (&mut A) and read dat from incoming vertices [B] (&[B])
+        // Safe: we mutate vertex A (&mut A) and read data from incoming vertices [B] (&[B])
         // TODO: maybe use arena? https://crates.io/crates/typed-arena
         unsafe {
             let ins = edges.iter().map(|incoming|{
@@ -171,7 +171,7 @@ impl Graph{
         }
     }
 
-    pub fn render(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host) -> Option<&Sample>{
+    pub fn render(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
             self.run_vertex(self.t, sb, fb, host, index, false);
@@ -209,7 +209,7 @@ impl Graph{
         }
     }
 
-    pub fn true_normalize_scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
+    pub fn true_normalize_scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>, chunks: usize){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         self.reset_scan_normalize_vertices();
@@ -251,7 +251,7 @@ impl Vertex{
     }
 
     // #[allow(clippy::too_many_arguments)]
-    fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, res: Vec<&Sample>){
+    fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>, res: Vec<&Sample>){
         let len = self.buf.len().min(ga.2);
         let ga = (ga.0, ga.1, len, ga.3);
         self.ext.generate(ga, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, res);

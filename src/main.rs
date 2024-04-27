@@ -1,6 +1,5 @@
 use mlua::prelude::*;
 use sdl2::audio::AudioSpecDesired;
-use lv2hm::Lv2Host;
 use term_basics_linux::*;
 
 mod sample;
@@ -69,7 +68,8 @@ fn main(){
         lua: Lua::new(),
         sb: SampleBank::new(proj_sr),
         g: Graph::new(config.settings.buffer_length(), proj_sr),
-        host: Lv2Host::new(1000, buffer_len * 2, proj_sr), // acount for l/r
+        // host: Lv2Host::new(1000, buffer_len * 2, proj_sr), // acount for l/r
+        host: None,
         fb: FlowwBank::new(proj_sr, buffer_len),
         bb: BufferBank::new(),
         contents,
