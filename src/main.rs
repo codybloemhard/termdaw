@@ -13,6 +13,7 @@ mod state;
 mod bufferbank;
 mod ui_workflow;
 mod stream_workflow;
+mod lv2;
 
 use sample::*;
 use graph::*;

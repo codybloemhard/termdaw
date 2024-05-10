@@ -1,8 +1,8 @@
 use crate::sample::{ Sample, SampleBank };
 use crate::floww::{ FlowwBank };
 use crate::extensions::*;
+use crate::lv2::Lv2Host;
 
-use lv2hm::Lv2Host;
 use term_basics_linux::UC;
 
 use std::collections::{ HashMap };

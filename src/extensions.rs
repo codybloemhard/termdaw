@@ -3,8 +3,8 @@ use crate::floww::{ FlowwBank };
 use crate::adsr::*;
 use crate::synth::*;
 use crate::graph::GenArgs;
+use crate::lv2::Lv2Host;
 
-use lv2hm::Lv2Host;
 use sampsyn::*;
 
 use core::f32::consts::PI;
@@ -52,6 +52,7 @@ pub enum VertexExt{
         wave_table: WaveTable,
         notes: Vec<(f32, f32, f32, f32, WaveTableState)>,
     },
+    #[cfg(feature = "lv2")]
     Lv2fx{
         index: usize,
     },
@@ -142,6 +143,7 @@ impl VertexExt{
         }
     }
 
+    #[cfg(feature = "lv2")]
     pub fn lv2fx(plugin_index: usize) -> Self{
         Self::Lv2fx{
             index: plugin_index,
@@ -188,8 +190,10 @@ impl VertexExt{
     }
 
     #[allow(clippy::too_many_arguments)]
-    pub fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Option<Lv2Host>, gain: f32, angle: f32, wet: f32,
-                    buf: &mut Sample, res: Vec<&Sample>){
+    pub fn generate(
+        &mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, _host: &mut Option<Lv2Host>,
+        gain: f32, angle: f32, wet: f32, buf: &mut Sample, res: Vec<&Sample>
+    ){
         let (t, sr, len, is_scan) = ga;
         if self.has_input(){
             sum_inputs(buf, len, res);
@@ -217,8 +221,9 @@ impl VertexExt{
             Self::SampSyn { floww_index, notes, adsr, wave_table } => {
                 sampsyn_gen(buf, fb, len, *floww_index, notes, adsr, wave_table, sr);
             },
+            #[cfg(feature = "lv2")]
             Self::Lv2fx { index } => {
-                lv2fx_gen(buf, len, wet, *index, host);
+                lv2fx_gen(buf, len, wet, *index, _host);
             },
             Self::Adsr { use_off, use_max, conf, note, floww_index, primary, ghost } => {
                 adsr_gen(buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note, primary, ghost);
@@ -241,6 +246,7 @@ impl VertexExt{
             Self::DebugSine { .. } => false,
             Self::Synth { .. } => false,
             Self::SampSyn { .. } => false,
+            #[cfg(feature = "lv2")]
             Self::Lv2fx { .. } => true,
             Self::Adsr { .. } => true,
             Self::BandPass { .. } => true,
@@ -522,7 +528,9 @@ fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: us
     notes.retain(|x| x.3 == 0.0 || x.2 <= adsr.release_sec);
 }
 
+#[cfg(feature = "lv2")]
 fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Option<Lv2Host>){
+    #[cfg(not(feature = "lv2"))]
     if wet < 0.0001 { return; }
     if let Some(host) = host {
         for i in 0..len{

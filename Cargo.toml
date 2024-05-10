@@ -6,6 +6,10 @@ edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+# default = ["lv2"]
+lv2 = ["dep:lv2-host-minimal"]
+
 [dependencies]
 mlua = { version = "0.5", features = ["lua53", "vendored"] }
 hound = "3.4.0"
@@ -14,7 +18,7 @@ toml = "0.5.8"
 serde = { version = "1.0.130", features = ["derive"] }
 skim = "0.9.4"
 sdl2 = "0.34.5"
-lv2-host-minimal = "0.1.4"
+lv2-host-minimal = { version = "0.1.4", optional = true }
 term-basics-linux = "0.5.7"
 fnrs = "0.1.6"
 sampsyn = "0.1.2"

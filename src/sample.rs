@@ -138,7 +138,7 @@ impl Sample{
         let mut mix = l.into_iter().zip(r).map(|(l,r)| l + r).collect::<Vec<_>>();
         let scale = 1.0 / absmax(&mix);
         mix.iter_mut().for_each(|s| *s *= scale);
-        self.l = mix.clone();
+        self.l.clone_from(&mix);
         self.r = mix;
     }
 
@@ -213,7 +213,7 @@ impl SampleBank{
     }
 
     pub fn add(&mut self, name: String, file: &str, method: SampleLoadMethod) -> Result<(), String>{
-        if self.names.get(&name).is_some() {
+        if self.names.contains_key(&name) {
             return Err(format!("{r}TermDaw: SampleBank: there is already a sample with name {b}\"{n}\"{r} present.",
                 r = UC::Red, b = UC::Blue, n = name));
         }

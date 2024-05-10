@@ -22,7 +22,7 @@ impl BufferBank{
     }
 
     pub fn add(&mut self, name: String, file_path: &str) -> Result<(), String>{
-        if self.names.get(&name).is_some() {
+        if self.names.contains_key(&name) {
             return Err(format!("{r}TermDaw: BufferBank: there is already a blob with name {b}\"{n}\"{r} present.",
                 r = UC::Red, b = UC::Blue, n = name));
         }

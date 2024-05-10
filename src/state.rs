@@ -6,11 +6,11 @@ use crate::floww::*;
 use crate::config::*;
 use crate::sample::*;
 use crate::bufferbank::*;
+use crate::lv2::*;
 
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use fnrs::{ vecs };
 use mlua::prelude::*;
-use lv2hm::*;
 use sampsyn::*;
 use term_basics_linux::*;
 
@@ -238,7 +238,9 @@ impl State{
 
         // Also don't recreate plugins
         // TODO: make renaming possible
+        #[cfg(feature = "lv2")]
         let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
+        #[cfg(feature = "lv2")]
         if let Some(host) = &mut self.host{
             for (name, _) in neg { // TODO: make plugins removable
                 host.remove_plugin(&name);
@@ -247,10 +249,12 @@ impl State{
             println!("{}Couldn't remove Lv2 plugins: no Lv2 host instantiated.", UC::Red);
         }
 
+        #[cfg(feature = "lv2")]
         if !pos.is_empty() && self.host.is_none(){
             self.host = Some(Lv2Host::new(1000, bl * 2, psr)); // acount for l/r
         }
 
+        #[cfg(feature = "lv2")]
         if let Some(host) = &mut self.host{
             let mut to_exclude = Vec::new();
             for (name, uri) in pos {
@@ -382,6 +386,7 @@ impl State{
             self.g.add(Vertex::new(bl, *gain, *angle, 0.0,
                 VertexExt::sampsyn(floww, adsr, table)), name.to_owned());
         }
+        #[cfg(feature = "lv2")]
         if let Some(host) = &mut self.host {
             for (name, gain, angle, wet, plugin) in &lv2fxs {
                 let index = get_index!(host, plugin, name, "plugin");
