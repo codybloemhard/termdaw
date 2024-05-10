@@ -1,14 +1,18 @@
 use crate::state::*;
 
+use std::{
+    thread,
+    sync::mpsc,
+    time::{ Duration, Instant },
+    io::Cursor,
+};
+
 use term_basics_linux::*;
 use skim::prelude::*;
 
-use std::thread;
-use std::sync::{ mpsc };
-use std::time::{ Duration, Instant };
-use std::io::{ Cursor };
-
-pub fn run_ui_workflow(proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>){
+pub fn run_ui_workflow(
+    proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>
+){
     let (transmit_to_ui, receive_in_ui) = mpsc::channel();
     let (transmit_to_main, receive_in_main) = mpsc::channel();
 
@@ -18,14 +22,20 @@ pub fn run_ui_workflow(proj_sr: usize, buffer_len: usize, state: State, device: 
 
 #[derive(PartialEq)]
 enum UiThreadMsg{
-    None, Ready, Quit, Refresh, Render, Normalize, Play, Pause, Stop, Skip, Prev, Set(usize), Get, NormVals
+    None, Ready, Quit, Refresh, Render, Normalize, Play, Pause, Stop, Skip, Prev, Set(usize),
+    Get, NormVals
 }
 
-fn launch_ui_thread(proj_sr: usize, transmit_to_main: mpsc::Sender<UiThreadMsg>, receive_in_ui: mpsc::Receiver<UiThreadMsg>){
+fn launch_ui_thread(
+    proj_sr: usize, transmit_to_main: mpsc::Sender<UiThreadMsg>,
+    receive_in_ui: mpsc::Receiver<UiThreadMsg>
+){
     thread::spawn(move || {
         let options = SkimOptionsBuilder::default()
             .height(Some("8%")).build().unwrap();
-        let input = "quit\nrender\nrefresh\nnormalize\nplay\npause\nstop\n>skip\n<prev\nset\nget\nnorm-vals".to_string();
+        let input =
+            "quit\nrender\nrefresh\nnormalize\nplay\npause\nstop\n>skip\n<prev\nset\nget\nnorm-vals"
+            .to_string();
         let item_reader = SkimItemReader::default();
         loop{
             let items = item_reader.of_bufread(Cursor::new(input.clone()));
@@ -78,8 +88,10 @@ fn launch_ui_thread(proj_sr: usize, transmit_to_main: mpsc::Sender<UiThreadMsg>,
     });
 }
 
-fn ui_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_sr: usize, buffer_len: usize,
-              transmit_to_ui: mpsc::Sender<UiThreadMsg>, receive_in_main: mpsc::Receiver<UiThreadMsg>){
+fn ui_partner(
+    mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_sr: usize, buffer_len: usize,
+    transmit_to_ui: mpsc::Sender<UiThreadMsg>, receive_in_main: mpsc::Receiver<UiThreadMsg>
+){
     let mut playing = false;
     let mut since = Instant::now();
     let mut millis_generated = 0f32;

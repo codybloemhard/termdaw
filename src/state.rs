@@ -1,22 +1,26 @@
-use crate::extensions::*;
-use crate::synth::*;
-use crate::adsr::*;
-use crate::graph::*;
-use crate::floww::*;
-use crate::config::*;
-use crate::sample::*;
-use crate::bufferbank::*;
-use crate::lv2::*;
+use crate::{
+    extensions::*,
+    synth::*,
+    adsr::*,
+    graph::*,
+    floww::*,
+    config::*,
+    sample::*,
+    bufferbank::*,
+    lv2::*,
+};
 
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
-use fnrs::{ vecs };
+use fnrs::vecs;
 use mlua::prelude::*;
 use sampsyn::*;
 use term_basics_linux::*;
 
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::{
+    fs::File,
+    io::Read,
+    path::Path,
+};
 
 pub struct State{
     pub lua: Lua,
@@ -46,7 +50,9 @@ impl State{
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
-        let mut file = if let Ok(f) = File::open(Path::new(&self.wdir).join(&self.config.settings.main)) { f }
+        let mut file = if let Ok(f) = File::open(
+            Path::new(&self.wdir).join(&self.config.settings.main)
+        ) { f }
         else {
             println!("{}Can't open main lua file!", UC::Red);
             return;
@@ -60,7 +66,8 @@ impl State{
 
         vecs!(
             new_samples, new_resources, new_lv2plugins, new_lv2params, midis, streams,
-            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, sampsyns, lv2fxs, adsrs,
+            sums, norms, sampleloops, samplemultis, samplelerps, debugsines, synths, sampsyns,
+            lv2fxs, adsrs,
             bandpasses,
             edges
         );
@@ -126,7 +133,11 @@ impl State{
             seed!("add_debug_sine", (String, f32, f32, String), debugsines);
                 // add_synth(name, gain, angle, floww, square_vel, square_z, square_adsr_conf,
                 //  topflat_vel, topflat_z, topflat_adsr_conf, triangle_vel, triangle_adsr_conf)
-            seed!("add_synth", (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>), synths);
+            seed!(
+                "add_synth",
+                (String, f32, f32, String, f32, f32, Vec<f32>, f32, f32, Vec<f32>, f32, Vec<f32>),
+                synths
+            );
                 // add_sampsyn(name, gain, angle, floww, adsr_conf, resource)
             seed!("add_sampsyn", (String, f32, f32, String, Vec<f32>, String), sampsyns);
                 // add_lv2fx(name, gain, angle, wet, plugin)
@@ -247,8 +258,10 @@ impl State{
             let mut to_exclude = Vec::new();
             for (name, uri) in pos {
                 if let Err(e) = self.host.add_plugin(&uri, name.clone()){
-                    println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
-                        r = UC::Red, b = UC::Blue, n = name, u = uri);
+                    println!(
+                        "{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
+                        r = UC::Red, b = UC::Blue, n = name, u = uri
+                    );
                     match e{
                         AddPluginError::CapacityReached => {
                             println!("{}\tCapacity reached!", UC::Red);
@@ -260,19 +273,32 @@ impl State{
                             println!("{}\tPlugin is null!", UC::Red);
                         },
                         AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
-                            println!("{}\tPlugin has more than two input or output audio ports!", UC::Red);
-                            println!("{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
-                                r = UC::Red, b = UC::Blue, i = ins, o = outs);
+                            println!(
+                                "{}\tPlugin has more than two input or output audio ports!",
+                                UC::Red
+                            );
+                            println!(
+                                "{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
+                                r = UC::Red, b = UC::Blue, i = ins, o = outs
+                            );
                         },
                         AddPluginError::MoreThanOneAtomPort(atomports) => {
-                            println!("{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
-                                r = UC::Red, b = UC::Blue, a = atomports);
+                            println!(
+                                "{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
+                                r = UC::Red, b = UC::Blue, a = atomports
+                            );
                         },
                         AddPluginError::PortNeitherInputOrOutput => {
-                            println!("{}\tPlugin has a port that is neither input or output.", UC::Red);
+                            println!(
+                                "{}\tPlugin has a port that is neither input or output.",
+                                UC::Red
+                            );
                         },
                         AddPluginError::PortNeitherControlOrAudioOrOptional => {
-                            println!("{}\tPlugin has a port that is neither control, audio or optional.", UC::Red);
+                            println!(
+                                "{}\tPlugin has a port that is neither control, audio or optional.",
+                                UC::Red
+                            );
                         },
                     }
                     to_exclude.push(name.clone());
@@ -310,18 +336,29 @@ impl State{
                 }
             }
         }
-        for (name, gain, angle) in &sums { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned()); }
-        for (name, gain, angle) in &norms { self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::normalize()), name.to_owned()); }
+        for (name, gain, angle) in &sums {
+            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sum()), name.to_owned());
+        }
+        for (name, gain, angle) in &norms {
+            self.g.add(
+                Vertex::new(bl, *gain, *angle, 0.0, VertexExt::normalize()), name.to_owned()
+            );
+        }
         for (name, gain, angle, sample) in &sampleloops {
             let index = get_index!(self.sb, sample, name, "sample");
-            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(index)), name.to_owned());
+            self.g.add(
+                Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_loop(index)), name.to_owned()
+            );
         }
         for (name, gain, angle, sample, floww, note) in &samplemultis {
             let sample = get_index!(self.sb, sample, name, "sample");
             let floww = get_index!(self.fb, floww, name, "floww");
             let note = if note < &0 { None }
             else { Some(*note as usize) };
-            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_multi(sample, floww, note)), name.to_owned());
+            self.g.add(
+                Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_multi(sample, floww, note)),
+                name.to_owned()
+            );
         }
         for (name, gain, angle, sample, floww, note, lerp_len) in &samplelerps {
             let sample = get_index!(self.sb, sample, name, "sample");
@@ -329,13 +366,24 @@ impl State{
             let note = if note < &0 { None }
             else { Some(*note as usize) };
             let lerp_len = (*lerp_len).max(0) as usize;
-            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::sample_lerp(sample, floww, note, lerp_len)), name.to_owned());
+            self.g.add(
+                Vertex::new(
+                    bl, *gain, *angle, 0.0, VertexExt::sample_lerp(sample, floww, note, lerp_len)
+                ),
+                name.to_owned()
+            );
         }
         for (name, gain, angle, floww) in &debugsines {
             let floww = get_index!(self.fb, floww, name, "floww");
-            self.g.add(Vertex::new(bl, *gain, *angle, 0.0, VertexExt::debug_sine(floww)), name.to_owned());
+            self.g.add(
+                Vertex::new(bl, *gain, *angle, 0.0, VertexExt::debug_sine(floww)),
+                name.to_owned()
+            );
         }
-        for (name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr) in &synths {
+        for (
+            name, gain, angle, floww, sq_vel, sq_z, sq_arr, tf_vel, tf_z, tf_arr, tr_vel, tr_arr
+        ) in &synths
+        {
             let floww = get_index!(self.fb, floww, name, "floww");
             let parse_adsr_conf = |arr| if let Some(config) = build_adsr_conf(arr){
                 config
@@ -364,8 +412,10 @@ impl State{
 
             let table = if let Some(t) = parse_wavetable_from_buffer(self.bb.get_buffer(buf_ind)) { t }
             else {
-                println!("{s}Could not parse wavetable from resource {b}\"{r}\"{s}, using default table!",
-                    s = UC::Std, b = UC::Blue, r = resource);
+                println!(
+                    "{s}Could not parse wavetable from resource {b}\"{r}\"{s}, using default table!",
+                    s = UC::Std, b = UC::Blue, r = resource
+                );
                 WaveTable::default()
             };
 
@@ -376,7 +426,10 @@ impl State{
         {
             for (name, gain, angle, wet, plugin) in &lv2fxs {
                 let index = get_index!(self.host, plugin, name, "plugin");
-                self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)), name.to_owned());
+                self.g.add(
+                    Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)),
+                    name.to_owned()
+                );
             }
         }
         for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
@@ -388,7 +441,12 @@ impl State{
             } else {
                 panic!("ADSR config must have 6 or 9 elements");
             };
-            self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, *use_max, conf, note, floww)), name.to_owned());
+            self.g.add(
+                Vertex::new(
+                    bl, *gain, *angle, *wet, VertexExt::adsr(*use_off, *use_max, conf, note, floww)
+                ),
+                name.to_owned()
+            );
         }
         for (name, gain, angle, wet, cut_off_hz_low, cut_off_hz_high, pass) in &bandpasses {
             self.g.add(Vertex::new(bl, *gain, *angle, *wet,
@@ -421,21 +479,29 @@ impl State{
 
         let (msr, mbd) = self.sb.get_max_sr_bd();
         if psr > self.render_sr{
-            println!("{y}TermDaw: warning: render will down sample from {b}{p}{y}(project s.r.) to {b}{r}{y}.",
-                y = UC::Yellow, b = UC::Blue, p = psr, r = self.render_sr);
+            println!(
+                "{y}TermDaw: warning: render will down sample from {b}{p}{y}(project s.r.) to {b}{r}{y}.",
+                y = UC::Yellow, b = UC::Blue, p = psr, r = self.render_sr
+            );
         }
         if msr > self.render_sr{
-            println!("{y}TermDaw: warning: render will down sample from peak input quality({b}{m}{y}) to {b}{r}{y}.",
-                y = UC::Yellow, b = UC::Blue, m = msr, r = self.render_sr);
+            println!(
+                "{y}TermDaw: warning: render will down sample from peak input quality({b}{m}{y}) to {b}{r}{y}.",
+                y = UC::Yellow, b = UC::Blue, m = msr, r = self.render_sr
+            );
         }
         if !(self.bd == 8 || self.bd == 16 || self.bd == 24 || self.bd == 32) {
-            println!("{r}Bitdepth of {b}{bd}{r} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
-                r = UC::Red, b = UC::Blue, bd = self.bd);
+            println!(
+                "{r}Bitdepth of {b}{bd}{r} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
+                r = UC::Red, b = UC::Blue, bd = self.bd
+            );
             return;
         }
         if mbd > self.bd{
-            println!("{y}TermDaw: warning: render will lose bitdepth from peak input quality({b}{m}{y} bits) to {b}{bd}{y} bits",
-                y = UC::Yellow, b = UC::Blue,  m = mbd, bd = self.bd);
+            println!(
+                "{y}TermDaw: warning: render will lose bitdepth from peak input quality({b}{m}{y} bits) to {b}{bd}{y} bits",
+                y = UC::Yellow, b = UC::Blue,  m = mbd, bd = self.bd
+            );
         }
         let spec = hound::WavSpec{
             channels: 2,
@@ -446,13 +512,17 @@ impl State{
         let mut writer = hound::WavWriter::create(self.output_file.clone(), spec).unwrap();
         let amplitude = if self.bd < 32 { ((1 << (self.bd - 1)) - 1) as f32 }
         else { i32::MAX as f32 };
-        fn write_16s<T: std::io::Write + std::io::Seek>(writer: &mut hound::WavWriter<T>, l: &[f32], r: &[f32], len: usize, amplitude: f32){
+        fn write_16s<T: std::io::Write + std::io::Seek>(
+            writer: &mut hound::WavWriter<T>, l: &[f32], r: &[f32], len: usize, amplitude: f32
+        ){
             for i in 0..len{
                 writer.write_sample((l[i] * amplitude) as i16).unwrap();
                 writer.write_sample((r[i] * amplitude) as i16).unwrap();
             }
         }
-        fn write_32s<T: std::io::Write + std::io::Seek>(writer: &mut hound::WavWriter<T>, l: &[f32], r: &[f32], len: usize, amplitude: f32){
+        fn write_32s<T: std::io::Write + std::io::Seek>(
+            writer: &mut hound::WavWriter<T>, l: &[f32], r: &[f32], len: usize, amplitude: f32
+        ){
             for i in 0..len{
                 writer.write_sample((l[i] * amplitude) as i32).unwrap();
                 writer.write_sample((r[i] * amplitude) as i32).unwrap();
@@ -476,8 +546,15 @@ impl State{
                 let chunk = chunk.unwrap();
                 let waves_in = vec![chunk.l.clone(), chunk.r.clone()];
                 let waves_out = resampler.process(&waves_in).unwrap();
-                if self.bd > 16 { write_32s(&mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude); }
-                else { write_16s(&mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude); }
+                if self.bd > 16 {
+                    write_32s(
+                        &mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude
+                    );
+                } else {
+                    write_16s(
+                        &mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude
+                    );
+                }
                 self.fb.set_time_to_next_block();
             }
         } else {
@@ -485,8 +562,11 @@ impl State{
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
-                if self.bd > 16 { write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
-                else { write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude); }
+                if self.bd > 16 {
+                    write_32s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude);
+                } else {
+                    write_16s(&mut writer, &chunk.l, &chunk.r, chunk.len(), amplitude);
+                }
                 self.fb.set_time_to_next_block();
             }
         }

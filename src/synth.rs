@@ -1,5 +1,6 @@
-use std::f32::consts::PI;
 use crate::adsr::AdsrConf;
+
+use std::f32::consts::PI;
 
 pub struct OscConf{
     pub volume: f32,

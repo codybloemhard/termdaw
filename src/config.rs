@@ -1,6 +1,8 @@
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
+use std::{
+    fs::File,
+    io::Read,
+    path::Path,
+};
 
 use serde::Deserialize;
 

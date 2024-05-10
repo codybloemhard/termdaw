@@ -1,11 +1,13 @@
-use crate::sample::{ Sample, SampleBank };
-use crate::floww::{ FlowwBank };
-use crate::extensions::*;
-use crate::lv2::Lv2Host;
+use crate::{
+    sample::{ Sample, SampleBank },
+    floww::{ FlowwBank },
+    extensions::*,
+    lv2::Lv2Host,
+};
+
+use std::collections::HashMap;
 
 use term_basics_linux::UC;
-
-use std::collections::{ HashMap };
 
 pub struct Graph{
     vertices: Vec<Vertex>,
@@ -93,7 +95,10 @@ impl Graph{
         self.connect_internal(a_index, b_index)
     }
 
-    fn run_vertex(&mut self, t: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, index: usize, is_scan: bool){
+    fn run_vertex(
+        &mut self, t: usize, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host,
+        index: usize, is_scan: bool
+    ){
         if index >= self.vertices.len() { return; }
         if self.ran_status[index] { return; }
         self.ran_status[index] = true;
@@ -108,7 +113,10 @@ impl Graph{
             let ins = edges.iter().map(|incoming|{
                 &*(self.vertices[*incoming].read_buffer() as *const _)
             }).collect::<Vec<_>>();
-            self.vertices[index].generate((t, self.sr, self.max_buffer_len, is_scan), sb, fb, host, ins);
+            self.vertices[index].generate(
+                (t, self.sr, self.max_buffer_len, is_scan),
+                sb, fb, host, ins
+            );
         }
     }
 
@@ -171,7 +179,9 @@ impl Graph{
         }
     }
 
-    pub fn render(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host) -> Option<&Sample>{
+    pub fn render(
+        &mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host
+    ) -> Option<&Sample>{
         self.reset_ran_stati();
         if let Some(index) = self.output_vertex{
             self.run_vertex(self.t, sb, fb, host, index, false);
@@ -209,7 +219,9 @@ impl Graph{
         }
     }
 
-    pub fn true_normalize_scan(&mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize){
+    pub fn true_normalize_scan(
+        &mut self, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, chunks: usize
+    ){
         let i = if let Some(index) = self.output_vertex{ index }
         else { return; };
         self.reset_scan_normalize_vertices();
@@ -251,7 +263,10 @@ impl Vertex{
     }
 
     // #[allow(clippy::too_many_arguments)]
-    fn generate(&mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank, host: &mut Lv2Host, res: Vec<&Sample>){
+    fn generate(
+        &mut self, ga: GenArgs, sb: &SampleBank, fb: &mut FlowwBank,
+        host: &mut Lv2Host, res: Vec<&Sample>
+    ){
         let len = self.buf.len().min(ga.2);
         let ga = (ga.0, ga.1, len, ga.3);
         self.ext.generate(ga, sb, fb, host, self.gain, self.angle, self.wet, &mut self.buf, res);

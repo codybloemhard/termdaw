@@ -1,8 +1,7 @@
+use std::collections::HashMap;
+
 use term_basics_linux::UC;
-
-use std::collections::{ HashMap };
-
-use ::floww::{ Floww, read_floww_from_midi, FlowwPacket, unpacket };
+use floww::{ Floww, read_floww_from_midi, FlowwPacket, unpacket };
 
 #[derive(Default)]
 pub struct FlowwBank{

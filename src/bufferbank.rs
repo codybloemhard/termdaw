@@ -1,8 +1,10 @@
-use term_basics_linux::UC;
+use std::{
+    collections::{ HashMap, HashSet },
+    io::prelude::*,
+    fs::File,
+};
 
-use std::collections::{ HashMap, HashSet };
-use std::io::prelude::*;
-use std::fs::File;
+use term_basics_linux::UC;
 
 pub type Buffer = Vec<u8>;
 
@@ -23,19 +25,25 @@ impl BufferBank{
 
     pub fn add(&mut self, name: String, file_path: &str) -> Result<(), String>{
         if self.names.contains_key(&name) {
-            return Err(format!("{r}TermDaw: BufferBank: there is already a blob with name {b}\"{n}\"{r} present.",
-                r = UC::Red, b = UC::Blue, n = name));
+            return Err(format!(
+                "{r}TermDaw: BufferBank: there is already a blob with name {b}\"{n}\"{r} present.",
+                r = UC::Red, b = UC::Blue, n = name
+            ));
         }
 
         let mut buffer = Vec::new();
         let mut file = if let Ok(file) = File::open(file_path) { file }
         else {
-            return Err(format!("{r}TermDaw: BufferBank: could open read file {b}\"{f}\"{r}.",
-                r = UC::Red, b = UC::Blue, f = file_path));
+            return Err(format!(
+                "{r}TermDaw: BufferBank: could open read file {b}\"{f}\"{r}.",
+                r = UC::Red, b = UC::Blue, f = file_path
+            ));
         };
         if file.read_to_end(&mut buffer).is_err() {
-            return Err(format!("{r}TermDaw: BufferBank: could not read file {b}\"{f}\"{r}.",
-                r = UC::Red, b = UC::Blue, f = file_path));
+            return Err(format!(
+                "{r}TermDaw: BufferBank: could not read file {b}\"{f}\"{r}.",
+                r = UC::Red, b = UC::Blue, f = file_path
+            ));
         }
 
         self.buffers.push(buffer);

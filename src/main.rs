@@ -15,19 +15,25 @@ mod ui_workflow;
 mod stream_workflow;
 mod lv2;
 
-use sample::*;
-use graph::*;
-use crate::floww::*;
-use config::*;
-use state::*;
-use bufferbank::*;
-use ui_workflow::*;
-use stream_workflow::*;
+use {
+    sample::*,
+    graph::*,
+    floww::*,
+    config::*,
+    state::*,
+    bufferbank::*,
+    ui_workflow::*,
+    stream_workflow::*,
+};
+
+#[cfg(feature = "lv2")]
 use lv2::Lv2Host;
 
-use std::fs::File;
-use std::io::{ Read };
-use std::path::{ Path };
+use std::{
+    fs::File,
+    io::Read,
+    path::Path,
+};
 
 fn main(){
     let args: Vec<String> = std::env::args().collect();
@@ -108,7 +114,7 @@ fn main(){
             return;
         }
     };
-    let desired_spec = AudioSpecDesired {
+    let desired_spec = AudioSpecDesired{
         freq: Some(proj_sr as i32),
         channels: Some(2),
         samples: None,

@@ -1,14 +1,18 @@
 use crate::state::*;
 
+use std::{
+    thread,
+    sync::mpsc,
+    time::{ Duration, Instant },
+    io::{ self },
+};
+
 use term_basics_linux::*;
-use ::floww::*;
+use floww::*;
 
-use std::thread;
-use std::sync::{ mpsc };
-use std::time::{ Duration, Instant };
-use std::io::{ self };
-
-pub fn run_stream_workflow(proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>){
+pub fn run_stream_workflow(
+    proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>
+){
     let (transmit_to_main, receive_in_main) = mpsc::channel();
 
     launch_stream_thread(transmit_to_main);
@@ -34,8 +38,10 @@ fn launch_stream_thread(transmit_to_main: mpsc::Sender<StreamThreadMsg>){
     });
 }
 
-fn stream_partner(mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_sr: usize, buffer_len: usize,
-                receive_in_main: mpsc::Receiver<StreamThreadMsg>){
+fn stream_partner(
+    mut state: State, device: sdl2::audio::AudioQueue<f32>, proj_sr: usize, buffer_len: usize,
+    receive_in_main: mpsc::Receiver<StreamThreadMsg>
+){
     let mut playing = false;
     let mut since = Instant::now();
     let mut millis_generated = 0f32;

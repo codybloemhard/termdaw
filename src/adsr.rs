@@ -1,4 +1,3 @@
-
 #[derive(Clone, Copy, Default)]
 pub struct AdsrConf{
     pub std_vel: f32,
@@ -13,7 +12,10 @@ pub struct AdsrConf{
 }
 
 impl AdsrConf{
-    pub fn hit_conf(attack_sec: f32, decay_sec: f32, decay_vel: f32, sustain_sec: f32, sustain_vel: f32, release_sec: f32) -> Self{
+    pub fn hit_conf(
+        attack_sec: f32, decay_sec: f32, decay_vel: f32,
+        sustain_sec: f32, sustain_vel: f32, release_sec: f32
+    ) -> Self{
         Self{
             std_vel: 0.0,
             attack_sec,
@@ -47,7 +49,11 @@ fn apply_ads_internal(conf: &AdsrConf, t: f32) -> f32{
     } else if t <= conf.attack_sec + conf.decay_sec{
         lerp(conf.attack_vel, conf.decay_vel, (t - conf.attack_sec) / conf.decay_sec)
     } else if t <= conf.attack_sec + conf.decay_sec + conf.sustain_sec{
-        lerp(conf.decay_vel, conf.sustain_vel, (t - conf.attack_sec - conf.decay_sec) / conf.sustain_sec)
+        lerp(
+            conf.decay_vel,
+            conf.sustain_vel,
+            (t - conf.attack_sec - conf.decay_sec) / conf.sustain_sec
+        )
     } else {
         -1000.0
     }
@@ -69,7 +75,11 @@ pub fn apply_r(conf: &AdsrConf, t: f32, old_val: f32) -> f32{
 pub fn apply_adsr(conf: &AdsrConf, t: f32) -> f32{
     let res = apply_ads_internal(conf, t);
     if res <= -1.0{
-        lerp(conf.sustain_vel, conf.release_vel, ((t - conf.attack_sec - conf.decay_sec - conf.sustain_sec) / conf.release_sec).min(1.0))
+        lerp(
+            conf.sustain_vel,
+            conf.release_vel,
+            ((t - conf.attack_sec - conf.decay_sec - conf.sustain_sec) / conf.release_sec).min(1.0)
+        )
     } else {
         res
     }

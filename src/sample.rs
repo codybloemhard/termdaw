@@ -1,7 +1,7 @@
+use std::collections::{ HashMap, HashSet };
+
 use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
 use term_basics_linux::UC;
-
-use std::collections::{ HashMap, HashSet };
 
 fn absmax(samples: &[f32]) -> f32{
     absmaxlen(samples, std::usize::MAX)
@@ -60,8 +60,10 @@ impl Sample{
             },
             _ => {
                 if l.len() != r.len() {
-                    return Err(format!("{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
-                        r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()));
+                    return Err(format!(
+                        "{r}TermDaw: Sample::from: l and r do not have the same length: {b}{llen}{r} and {b}{rlen}{r}.",
+                        r = UC::Red, b = UC::Blue, llen = l.len(), rlen = r.len()
+                    ));
                 }
                 if l.is_empty(){
                     return Err(format!("{r}TermDaw: Sample::from: l and r have length {b}0{r}.",
@@ -214,31 +216,41 @@ impl SampleBank{
 
     pub fn add(&mut self, name: String, file: &str, method: SampleLoadMethod) -> Result<(), String>{
         if self.names.contains_key(&name) {
-            return Err(format!("{r}TermDaw: SampleBank: there is already a sample with name {b}\"{n}\"{r} present.",
-                r = UC::Red, b = UC::Blue, n = name));
+            return Err(format!(
+                "{r}TermDaw: SampleBank: there is already a sample with name {b}\"{n}\"{r} present.",
+                r = UC::Red, b = UC::Blue, n = name
+            ));
         }
         let mut reader = if let Ok(reader) = hound::WavReader::open(file){
             reader
         } else {
-            return Err(format!("{r}TermDaw: SampleBank: could not open file {b}\"{f}\"{r}.",
-                r = UC::Red, b = UC::Blue, f = file));
+            return Err(format!(
+                "{r}TermDaw: SampleBank: could not open file {b}\"{f}\"{r}.",
+                r = UC::Red, b = UC::Blue, f = file
+            ));
         };
         let specs = reader.spec();
         if method == SampleLoadMethod::Stereo && specs.channels != 2{
-            return Err(format!("{r}TermDaw: SampleBank: only 2 channel samples are supported for stereo samples, found {b}{s}{r} channels.",
-                r = UC::Red, b = UC::Blue, s = specs.channels));
+            return Err(format!(
+                "{r}TermDaw: SampleBank: only 2 channel samples are supported for stereo samples, found {b}{s}{r} channels.",
+                r = UC::Red, b = UC::Blue, s = specs.channels
+            ));
         }
         if method != SampleLoadMethod::Stereo && specs.channels > 2{
-            return Err(format!("{r}TermDaw: SampleBank: only 1,2 channel samples are supported for left or right samples, found {b}{s}{r} channels.",
-                r = UC::Red, b = UC::Blue, s = specs.channels));
+            return Err(format!(
+                "{r}TermDaw: SampleBank: only 1,2 channel samples are supported for left or right samples, found {b}{s}{r} channels.",
+                r = UC::Red, b = UC::Blue, s = specs.channels
+            ));
         }
         let sr = specs.sample_rate as usize;
         let bd = specs.bits_per_sample;
         self.max_sr = self.max_sr.max(sr);
         self.max_bd = self.max_bd.max(bd as usize);
         if sr > self.sample_rate {
-            println!("{y}TermDaw: warning: sample {b}\"{n}\"{y} has a higher samplerate({b}{sr}{y}) than the project({b}{psr}{y}).",
-                y = UC::Yellow, b = UC::Blue, n = name, sr = sr, psr = self.sample_rate);
+            println!(
+                "{y}TermDaw: warning: sample {b}\"{n}\"{y} has a higher samplerate({b}{sr}{y}) than the project({b}{psr}{y}).",
+                y = UC::Yellow, b = UC::Blue, n = name, sr = sr, psr = self.sample_rate
+            );
         }
         let mut linear = Vec::new();
         if specs.sample_format == hound::SampleFormat::Float{

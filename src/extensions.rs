@@ -1,14 +1,16 @@
-use crate::sample::{ Sample, SampleBank };
-use crate::floww::{ FlowwBank };
-use crate::adsr::*;
-use crate::synth::*;
-use crate::graph::GenArgs;
-use crate::lv2::Lv2Host;
-
-use sampsyn::*;
+use crate::{
+    sample::{ Sample, SampleBank },
+    floww::FlowwBank,
+    adsr::*,
+    synth::*,
+    graph::GenArgs,
+    lv2::Lv2Host,
+};
 
 use core::f32::consts::PI;
-use std::collections::{ VecDeque };
+use std::collections::VecDeque;
+
+use sampsyn::*;
 
 pub enum VertexExt{
     Sum,
@@ -105,7 +107,9 @@ impl VertexExt{
         }
     }
 
-    pub fn sample_lerp(sample_index: usize, floww_index: usize, note: Option<usize>, lerp_len: usize) -> Self{
+    pub fn sample_lerp(
+        sample_index: usize, floww_index: usize, note: Option<usize>, lerp_len: usize
+    ) -> Self{
         Self::SampleLerp{
             sample_index,
             floww_index,
@@ -124,7 +128,9 @@ impl VertexExt{
         }
     }
 
-    pub fn synth(floww_index: usize, square_conf: OscConf, topflat_conf: OscConf, triangle_conf: OscConf) -> Self{
+    pub fn synth(
+        floww_index: usize, square_conf: OscConf, topflat_conf: OscConf, triangle_conf: OscConf
+    ) -> Self{
         Self::Synth{
             floww_index,
             notes: Vec::new(),
@@ -150,7 +156,9 @@ impl VertexExt{
         }
     }
 
-    pub fn adsr(use_off: bool, use_max: bool, conf: AdsrConf, note: Option<usize>, floww_index: usize) -> Self{
+    pub fn adsr(
+        use_off: bool, use_max: bool, conf: AdsrConf, note: Option<usize>, floww_index: usize
+    ) -> Self{
         Self::Adsr{
             use_off,
             use_max,
@@ -162,11 +170,17 @@ impl VertexExt{
         }
     }
 
-    pub fn band_pass(cut_off_hz_low: f32, cut_off_hz_hig: f32, pass: bool, sampling_hz: usize) -> Self{
+    pub fn band_pass(
+        cut_off_hz_low: f32, cut_off_hz_hig: f32, pass: bool, sampling_hz: usize
+    ) -> Self{
         let lco = cut_off_hz_low.min(20000.0).max(0.0);
         let hco = cut_off_hz_hig.min(20000.0).max(0.0);
-        let lgamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * lco / sampling_hz as f32);
-        let hgamma = 1.0 - std::f32::consts::E.powf(-2.0 * std::f32::consts::PI * hco / sampling_hz as f32);
+        let lgamma = 1.0 - std::f32::consts::E.powf(
+            -2.0 * std::f32::consts::PI * lco / sampling_hz as f32
+        );
+        let hgamma = 1.0 - std::f32::consts::E.powf(
+            -2.0 * std::f32::consts::PI * hco / sampling_hz as f32
+        );
         Self::BandPass{
             lgamma,
             hgamma,
@@ -209,14 +223,22 @@ impl VertexExt{
             Self::SampleMulti { ts, sample_index, floww_index, note } => {
                 sample_multi_gen(buf, sb, fb, len, ts, *sample_index, *floww_index, *note);
             },
-            Self::SampleLerp { sample_index, floww_index, note, countdown, lerp_len, primary, ghost } => {
-                sample_lerp_gen(buf, sb, fb, len, *sample_index, *floww_index, *note, *lerp_len, countdown, primary, ghost);
+            Self::SampleLerp {
+                sample_index, floww_index, note, countdown, lerp_len, primary, ghost
+            } => {
+                sample_lerp_gen(
+                    buf, sb, fb, len, *sample_index, *floww_index, *note, *lerp_len,
+                    countdown, primary, ghost
+                );
             },
             Self::DebugSine { floww_index, notes } => {
                 debug_sine_gen(buf, fb, len, *floww_index, notes, t, sr);
             },
             Self::Synth { floww_index, notes, square_conf, topflat_conf, triangle_conf } => {
-                synth_gen(buf, fb, len, *floww_index, notes, square_conf, topflat_conf, triangle_conf, t, sr);
+                synth_gen(
+                    buf, fb, len, *floww_index, notes, square_conf, topflat_conf, triangle_conf,
+                    t, sr
+                );
             },
             Self::SampSyn { floww_index, notes, adsr, wave_table } => {
                 sampsyn_gen(buf, fb, len, *floww_index, notes, adsr, wave_table, sr);
@@ -226,10 +248,15 @@ impl VertexExt{
                 lv2fx_gen(buf, len, wet, *index, _host);
             },
             Self::Adsr { use_off, use_max, conf, note, floww_index, primary, ghost } => {
-                adsr_gen(buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note, primary, ghost);
+                adsr_gen(
+                    buf, len, fb, wet, *use_off, *use_max, *floww_index, sr, conf, *note,
+                    primary, ghost
+                );
             },
             Self::BandPass { lprevl, lprevr, hprevl, hprevr, lgamma, hgamma, first, pass } => {
-                band_pass_gen(buf, len, wet, first, *pass, *lgamma, *hgamma, lprevl, lprevr, hprevl, hprevr);
+                band_pass_gen(
+                    buf, len, wet, first, *pass, *lgamma, *hgamma, lprevl, lprevr, hprevl, hprevr
+                );
             }
         }
         buf.apply_angle(angle, len);
@@ -301,7 +328,9 @@ fn normalize_gen(buf: &mut Sample, len: usize, max: &mut f32, scan_max: &mut f32
     buf.scale(len, 1.0 / *max);
 }
 
-fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize, sample_index: usize){
+fn sample_loop_gen(
+    buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize, sample_index: usize
+){
     let sample = sb.get_sample(sample_index);
     let l = sample.len();
     for i in 0..len{
@@ -312,7 +341,11 @@ fn sample_loop_gen(buf: &mut Sample, sb: &SampleBank, len: usize, t: &mut usize,
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize, target_note: Option<usize>){
+fn sample_multi_gen(
+    buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize,
+    ts: &mut VecDeque<(i64, f32)>, sample_index: usize, floww_index: usize,
+    target_note: Option<usize>
+){
     let sample = sb.get_sample(sample_index);
     fb.start_block(floww_index);
     for i in 0..len{
@@ -322,7 +355,8 @@ fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: 
             }
             else { true };
             if ok{
-                ts.push_back((-(i as i64), v)); // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
+                // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
+                ts.push_back((-(i as i64), v));
             }
         }
         buf.l[i] = 0.0;
@@ -347,8 +381,11 @@ fn sample_multi_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: 
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, sample_index: usize,
-    floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize, primary: &mut (i64, f32), ghost: &mut (i64, f32)){
+fn sample_lerp_gen(
+    buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: usize, sample_index: usize,
+    floww_index: usize, target_note: Option<usize>, lerp_len: usize, countdown: &mut usize,
+    primary: &mut (i64, f32), ghost: &mut (i64, f32)
+){
     let sample = sb.get_sample(sample_index);
     fb.start_block(floww_index);
     for i in 0..len{
@@ -359,7 +396,8 @@ fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: u
             else { true };
             if ok{
                 *ghost = *primary;
-                *primary = (-(i as i64), v); // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
+                // line up with i so that (t + i) = (-i + i) = 0 is the first frame copied
+                *primary = (-(i as i64), v);
                 *countdown = lerp_len;
             }
         }
@@ -382,7 +420,10 @@ fn sample_lerp_gen(buf: &mut Sample, sb: &SampleBank, fb: &mut FlowwBank, len: u
     ghost.0 += len as i64;
 }
 
-fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32)>, t: usize, sr: usize){
+fn debug_sine_gen(
+    buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize,
+    notes: &mut Vec<(f32, f32)>, t: usize, sr: usize
+){
     fb.start_block(floww_index);
     for i in 0..len{
         for (on, note, vel) in fb.get_block_simple(floww_index, i){
@@ -416,8 +457,11 @@ fn debug_sine_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index:
 }
 
 #[allow(clippy::too_many_arguments)]
-fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32)>,
-            square: &OscConf, topflat: &OscConf, triangle: &OscConf, t: usize, sr: usize){
+fn synth_gen(
+    buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize,
+    notes: &mut Vec<(f32, f32, f32, f32)>, square: &OscConf, topflat: &OscConf, triangle: &OscConf,
+    t: usize, sr: usize
+){
     let osc_amp_multiplier = 1.0 / (
         square.volume * square.adsr.max_vel() +
         topflat.volume * topflat.adsr.max_vel() +
@@ -463,10 +507,12 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 
             let mut s = 0.0;
             if square.volume > 0.0 {
-                s += square_sine_sample(time, hz, square.param) * vel * env_vel(&square.adsr) * square.volume;
+                s += square_sine_sample(time, hz, square.param) * vel * env_vel(&square.adsr)
+                    * square.volume;
             }
             if topflat.volume > 0.0 {
-                s += topflat_sine_sample(time, hz, topflat.param) * vel * env_vel(&topflat.adsr) * topflat.volume;
+                s += topflat_sine_sample(time, hz, topflat.param) * vel * env_vel(&topflat.adsr)
+                    * topflat.volume;
             }
             if triangle.volume > 0.0 {
                 s += triangle_sample(time, hz) * vel * env_vel(&triangle.adsr) * triangle.volume;
@@ -483,8 +529,11 @@ fn synth_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usiz
 }
 
 #[allow(clippy::too_many_arguments)]
-fn sampsyn_gen(buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize, notes: &mut Vec<(f32, f32, f32, f32, WaveTableState)>,
-            adsr: &AdsrConf, wave_table: &WaveTable, sr: usize){
+fn sampsyn_gen(
+    buf: &mut Sample, fb: &mut FlowwBank, len: usize, floww_index: usize,
+    notes: &mut Vec<(f32, f32, f32, f32, WaveTableState)>, adsr: &AdsrConf, wave_table: &WaveTable,
+    sr: usize
+){
     let amp_multiplier = 1.0 / adsr.max_vel();
     fb.start_block(floww_index);
     for i in 0..len{
@@ -541,8 +590,11 @@ fn lv2fx_gen(buf: &mut Sample, len: usize, wet: f32, index: usize, host: &mut Lv
 }
 
 #[allow(clippy::too_many_arguments)]
-fn adsr_gen(buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, use_max: bool, floww_index: usize,
-            sr: usize, conf: &AdsrConf, note: Option<usize>, primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)){
+fn adsr_gen(
+    buf: &mut Sample, len: usize, fb: &mut FlowwBank, wet: f32, use_off: bool, use_max: bool,
+    floww_index: usize, sr: usize, conf: &AdsrConf, note: Option<usize>,
+    primary: &mut (f32, f32, f32), ghost: &mut (f32, f32, f32)
+){
     if wet < 0.0001 { return; }
     let maxmul = if use_max { 1.0 } else { 0.0 };
     let minmul = 1.0 - maxmul;
