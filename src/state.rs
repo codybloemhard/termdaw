@@ -22,7 +22,7 @@ pub struct State{
     pub lua: Lua,
     pub sb: SampleBank,
     pub g: Graph,
-    pub host: Option<Lv2Host>,
+    pub host: Lv2Host,
     pub fb: FlowwBank,
     pub bb: BufferBank,
     pub config: Config,
@@ -239,26 +239,14 @@ impl State{
         // Also don't recreate plugins
         // TODO: make renaming possible
         #[cfg(feature = "lv2")]
-        let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
-        #[cfg(feature = "lv2")]
-        if let Some(host) = &mut self.host{
+        {
+            let (pos, neg) = diff(&self.cur_lv2plugins, &new_lv2plugins);
             for (name, _) in neg { // TODO: make plugins removable
-                host.remove_plugin(&name);
+                self.host.remove_plugin(&name);
             }
-        } else if !(neg.is_empty() && pos.is_empty()){
-            println!("{}Couldn't remove Lv2 plugins: no Lv2 host instantiated.", UC::Red);
-        }
-
-        #[cfg(feature = "lv2")]
-        if !pos.is_empty() && self.host.is_none(){
-            self.host = Some(Lv2Host::new(1000, bl * 2, psr)); // acount for l/r
-        }
-
-        #[cfg(feature = "lv2")]
-        if let Some(host) = &mut self.host{
             let mut to_exclude = Vec::new();
             for (name, uri) in pos {
-                if let Err(e) = host.add_plugin(&uri, name.clone()){
+                if let Err(e) = self.host.add_plugin(&uri, name.clone()){
                     println!("{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
                         r = UC::Red, b = UC::Blue, n = name, u = uri);
                     match e{
@@ -297,15 +285,13 @@ impl State{
             // need diff to see what params we need to reset
             let (pos, neg) = diff(&self.cur_lv2params, &new_lv2params);
             for (plugin, name, _) in neg { // TODO: make params resetable in Lv2hm
-                host.reset_value(&plugin, &name);
+                self.host.reset_value(&plugin, &name);
             }
             for (plugin, name, value) in pos{
-                host.set_value(&plugin, &name, value);
+                self.host.set_value(&plugin, &name, value);
             }
 
             self.cur_lv2params = new_lv2params;
-        } else if !pos.is_empty(){
-            println!("{}Couldn't load Lv2 plugins: Lv2 host failed to init.", UC::Red);
         }
 
         // just rebuild the damn thing, if it becomes problematic i'll do something about it,
@@ -387,13 +373,11 @@ impl State{
                 VertexExt::sampsyn(floww, adsr, table)), name.to_owned());
         }
         #[cfg(feature = "lv2")]
-        if let Some(host) = &mut self.host {
+        {
             for (name, gain, angle, wet, plugin) in &lv2fxs {
-                let index = get_index!(host, plugin, name, "plugin");
+                let index = get_index!(self.host, plugin, name, "plugin");
                 self.g.add(Vertex::new(bl, *gain, *angle, *wet, VertexExt::lv2fx(index)), name.to_owned());
             }
-        } else if !lv2fxs.is_empty() {
-            println!("{}Couldn't add Lv2 vertices: no Lv2 instance.", UC::Red)
         }
         for (name, gain, angle, wet, floww, use_off, use_max, note, conf_arr) in &adsrs {
             let floww = get_index!(self.fb, floww, name, "floww");

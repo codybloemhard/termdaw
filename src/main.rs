@@ -23,6 +23,7 @@ use state::*;
 use bufferbank::*;
 use ui_workflow::*;
 use stream_workflow::*;
+use lv2::Lv2Host;
 
 use std::fs::File;
 use std::io::{ Read };
@@ -69,8 +70,10 @@ fn main(){
         lua: Lua::new(),
         sb: SampleBank::new(proj_sr),
         g: Graph::new(config.settings.buffer_length(), proj_sr),
-        // host: Lv2Host::new(1000, buffer_len * 2, proj_sr), // acount for l/r
-        host: None,
+        #[cfg(feature = "lv2")]
+        host: Lv2Host::new(1000, buffer_len * 2, proj_sr), // acount for l/r
+        #[cfg(not(feature = "lv2"))]
+        host: (),
         fb: FlowwBank::new(proj_sr, buffer_len),
         bb: BufferBank::new(),
         contents,
