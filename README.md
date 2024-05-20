@@ -1,8 +1,11 @@
 # termdaw
+
 A daw, in a terminal.
-Termdaw is a (or should become a) terminal, graph based programmable pipeline digital audio workstation that is friendly to automatization and AI/Algorithmic composition.
+Termdaw is a (or should become a) terminal, graph based programmable pipeline
+digital audio workstation that is friendly to automatization and algorithmic composition.
 
 ## MVP Goals
+
 - Audio
   - [x] Render audio
     - Any samplerate: will up or down sample from project rate
@@ -52,6 +55,7 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
   - [x] Examples
 
 ## Goals for later
+
 - [ ] Multitype graph
   - [ ] In/Out ports
   - [ ] Type checker
@@ -70,9 +74,11 @@ Termdaw is a (or should become a) terminal, graph based programmable pipeline di
 - [ ] Multithreading
 
 ## Failed
+
 - [ ] Bounded normalization: lv2 plugin's output can have more gain than input, no way to know how much.
 
 ## Example
+
 ```toml
 [project]
 name = "Example Project"
@@ -106,7 +112,7 @@ set_output("sum");
 ## License
 
 ```
-Copyright (C) 2022 Cody Bloemhard
+Copyright (C) 2024 Cody Bloemhard
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
