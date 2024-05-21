@@ -12,14 +12,14 @@ lv2 = ["dep:lv2-host-minimal"]
 
 [dependencies]
 mlua = { version = "0.9.8", features = ["lua53", "vendored"] }
-hound = "3.4.0"
-rubato = "0.8.1"
-toml = "0.5.8"
-serde = { version = "1.0.130", features = ["derive"] }
-skim = "0.9.4"
-sdl2 = "0.34.5"
+hound = "3.5.1"
+rubato = "0.8.1" # to bump
+toml = "0.8.13"
+serde = { version = "1.0.202", features = ["derive"] }
+skim = "0.10.4"
+sdl2 = "0.34.5" # to bump, also bump in sampsyn
 lv2-host-minimal = { version = "0.1.4", optional = true }
-term-basics-linux = "0.5.7"
+term-basics-linux = "0.5.8" # to bump
 fnrs = "0.1.6"
 sampsyn = "0.1.2"
 floww = "0.1.10"
