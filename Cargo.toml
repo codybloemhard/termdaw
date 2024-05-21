@@ -11,7 +11,7 @@ edition = "2021"
 lv2 = ["dep:lv2-host-minimal"]
 
 [dependencies]
-mlua = { version = "0.5", features = ["lua53", "vendored"] }
+mlua = { version = "0.9.8", features = ["lua53", "vendored"] }
 hound = "3.4.0"
 rubato = "0.8.1"
 toml = "0.5.8"
