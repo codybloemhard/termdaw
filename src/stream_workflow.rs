@@ -95,7 +95,7 @@ fn stream_partner(
                     let chunk = state.g.render(&state.sb, &mut state.fb, &mut state.host);
                     let chunk = chunk.unwrap();
                     let stream_data = chunk.clone().interleave();
-                    device.queue(&stream_data);
+                    let _ = device.queue_audio(&stream_data);
                     millis_generated += buffer_len as f32 / proj_sr as f32 * 1000.0;
                     state.fb.set_time_to_next_block();
                 }
