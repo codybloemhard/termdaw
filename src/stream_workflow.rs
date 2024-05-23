@@ -7,8 +7,8 @@ use std::{
     io::{ self },
 };
 
-use term_basics_linux::*;
 use floww::*;
+use zen_colour::*;
 
 pub fn run_stream_workflow(
     proj_sr: usize, buffer_len: usize, state: State, device: sdl2::audio::AudioQueue<f32>
@@ -31,7 +31,7 @@ fn launch_stream_thread(transmit_to_main: mpsc::Sender<StreamThreadMsg>){
             if let Ok(res) = io::stdin().lock().decoded(){
                 transmit_to_main.send(StreamThreadMsg::Feed(res)).unwrap();
             } else {
-                println!("{}Error: could not decode std input.{}", UC::Red, UC::Std);
+                println!("{}Error: could not decode std input.{}", RED, DEFAULT);
                 std::process::exit(0x0100);
             }
         }
@@ -50,7 +50,7 @@ fn stream_partner(
             macro_rules! check_loaded{
                 ($b:block) => {
                     if !state.loaded{
-                        println!("{}State not loaded!", UC::Red);
+                        println!("{}State not loaded!", RED);
                     } else {
                         $b;
                     }

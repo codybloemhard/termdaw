@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use term_basics_linux::UC;
 use floww::{ Floww, read_floww_from_midi, FlowwPacket, unpacket };
+use zen_colour::*;
 
 #[derive(Default)]
 pub struct FlowwBank{
@@ -43,7 +43,7 @@ impl FlowwBank{
             Ok(())
         } else {
             Err(format!("{r}Could not read midi file: {b}\"{x}\"{r}.",
-                r = UC::Red, b = UC::Blue, x = path))
+                r = RED, b = BLUE, x = path))
         }
     }
 

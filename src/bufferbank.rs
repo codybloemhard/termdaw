@@ -4,7 +4,7 @@ use std::{
     fs::File,
 };
 
-use term_basics_linux::UC;
+use zen_colour::*;
 
 pub type Buffer = Vec<u8>;
 
@@ -27,7 +27,7 @@ impl BufferBank{
         if self.names.contains_key(&name) {
             return Err(format!(
                 "{r}TermDaw: BufferBank: there is already a blob with name {b}\"{n}\"{r} present.",
-                r = UC::Red, b = UC::Blue, n = name
+                r = RED, b = BLUE, n = name
             ));
         }
 
@@ -36,13 +36,13 @@ impl BufferBank{
         else {
             return Err(format!(
                 "{r}TermDaw: BufferBank: could open read file {b}\"{f}\"{r}.",
-                r = UC::Red, b = UC::Blue, f = file_path
+                r = RED, b = BLUE, f = file_path
             ));
         };
         if file.read_to_end(&mut buffer).is_err() {
             return Err(format!(
                 "{r}TermDaw: BufferBank: could not read file {b}\"{f}\"{r}.",
-                r = UC::Red, b = UC::Blue, f = file_path
+                r = RED, b = BLUE, f = file_path
             ));
         }
 

@@ -14,7 +14,7 @@ use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters
 use fnrs::vecs;
 use mlua::prelude::*;
 use sampsyn::*;
-use term_basics_linux::*;
+use zen_colour::*;
 
 use std::{
     fs::File,
@@ -54,12 +54,12 @@ impl State{
             Path::new(&self.wdir).join(&self.config.settings.main)
         ) { f }
         else {
-            println!("{}Can't open main lua file!", UC::Red);
+            println!("{}Can't open main lua file!", RED);
             return;
         };
         self.contents.clear();
         if let Err(e) = file.read_to_string(&mut self.contents){
-            println!("{}Could not read main lua file!", UC::Red);
+            println!("{}Could not read main lua file!", RED);
             println!("\t{}", e);
             return;
         }
@@ -156,7 +156,7 @@ impl State{
             self.lua.load(&self.contents).exec()
         });
         if let Err(e) = luares{
-            println!("{}Could not execute lua code!", UC::Red);
+            println!("{}Could not execute lua code!", RED);
             println!("\t{}", e);
             return;
         }
@@ -200,17 +200,17 @@ impl State{
         let (pos, neg) = diff(&self.cur_samples, &new_samples);
         for (name, _, _) in neg {
             println!("{s}Info: sample {b}\"{x}\"{s} will be removed from the sample bank.",
-                    s = UC::Std, b = UC::Blue, x = name);
+                    s = DEFAULT, b = BLUE, x = name);
             self.sb.mark_dead(&name);
         }
-        println!("{}Status: refreshing sample bank.", UC::Std);
+        println!("{}Status: refreshing sample bank.", DEFAULT);
         self.sb.refresh();
         let mut to_exclude = Vec::new();
         for (name, file, method) in pos {
             println!("{s}Status: adding sample {b}\"{x}\"{s} to the sample bank.",
-                    s = UC::Std, b = UC::Blue, x = name);
+                    s = DEFAULT, b = BLUE, x = name);
             if let Err(msg) = self.sb.add(name.clone(), &file, SampleLoadMethod::from(&method)){
-                println!("{}{}", UC::Red, msg);
+                println!("{}{}", RED, msg);
                 to_exclude.push(name);
             }
         }
@@ -220,15 +220,15 @@ impl State{
         let (pos, neg) = diff(&self.cur_resources, &new_resources);
         for (name, _) in neg {
             println!("{s}Info: resource {b}\"{x}\"{s} will be removed.",
-                    s = UC::Std, b = UC::Blue, x = name);
+                    s = DEFAULT, b = BLUE, x = name);
             self.bb.mark_dead(&name);
         }
-        println!("{}Status: refreshing resources.", UC::Std);
+        println!("{}Status: refreshing resources.", DEFAULT);
         self.bb.refresh();
         let mut to_exclude = Vec::new();
         for (name, file) in pos{
             if let Err(msg) = self.bb.add(name.clone(), &file){
-                println!("{}{}", UC::Red, msg);
+                println!("{}{}", RED, msg);
                 to_exclude.push(name);
             }
         }
@@ -238,7 +238,7 @@ impl State{
         self.fb.reset();
         for (name, file) in midis{
             if let Err(msg) = self.fb.add_floww(name, &file){
-                println!("{}{}", UC::Red, msg);
+                println!("{}{}", RED, msg);
                 return;
             }
         }
@@ -260,51 +260,51 @@ impl State{
                 if let Err(e) = self.host.add_plugin(&uri, name.clone()){
                     println!(
                         "{r}Couldn't load Lv2 plugin with name: {b}\"{n}\"{r} and uri: {b}\"{u}\"{r}.",
-                        r = UC::Red, b = UC::Blue, n = name, u = uri
+                        r = RED, b = BLUE, n = name, u = uri
                     );
                     match e{
                         AddPluginError::CapacityReached => {
-                            println!("{}\tCapacity reached!", UC::Red);
+                            println!("{}\tCapacity reached!", RED);
                         },
                         AddPluginError::WorldIsNull => {
-                            println!("{}\tWorld is null!", UC::Red);
+                            println!("{}\tWorld is null!", RED);
                         },
                         AddPluginError::PluginIsNull => {
-                            println!("{}\tPlugin is null!", UC::Red);
+                            println!("{}\tPlugin is null!", RED);
                         },
                         AddPluginError::MoreThanTwoInOrOutAudioPorts(ins, outs) => {
                             println!(
                                 "{}\tPlugin has more than two input or output audio ports!",
-                                UC::Red
+                                RED
                             );
                             println!(
                                 "{r}\tAudio inputs: {b}{i}{r}, audio outputs: {b}{o}",
-                                r = UC::Red, b = UC::Blue, i = ins, o = outs
+                                r = RED, b = BLUE, i = ins, o = outs
                             );
                         },
                         AddPluginError::MoreThanOneAtomPort(atomports) => {
                             println!(
                                 "{r}\tPlugin has more than one atom ports! Atom ports: {b}{a}{r}.",
-                                r = UC::Red, b = UC::Blue, a = atomports
+                                r = RED, b = BLUE, a = atomports
                             );
                         },
                         AddPluginError::PortNeitherInputOrOutput => {
                             println!(
                                 "{}\tPlugin has a port that is neither input or output.",
-                                UC::Red
+                                RED
                             );
                         },
                         AddPluginError::PortNeitherControlOrAudioOrOptional => {
                             println!(
                                 "{}\tPlugin has a port that is neither control, audio or optional.",
-                                UC::Red
+                                RED
                             );
                         },
                     }
                     to_exclude.push(name.clone());
                 }
                 println!("{s}Info: added plugin {b}{n}{s} with uri {b}{u}{s}.",
-                    s = UC::Std, b = UC::Blue, n = name, u = uri);
+                    s = DEFAULT, b = BLUE, n = name, u = uri);
             }
             do_excluding!(to_exclude, new_lv2plugins, self.cur_lv2plugins);
 
@@ -322,7 +322,7 @@ impl State{
 
         // just rebuild the damn thing, if it becomes problematic i'll do something about it,
         // probably :)
-        println!("{}Status: rebuilding graph.", UC::Std);
+        println!("{}Status: rebuilding graph.", DEFAULT);
         self.g.reset();
         macro_rules! get_index{
             ($obj:expr, $arg:expr, $name:expr, $category:expr) => {
@@ -330,7 +330,7 @@ impl State{
                     Some(i) => i,
                     None => {
                         println!("{}Could not get {} index for vertex {}\"{}\"{}.",
-                            UC::Red, $category, UC::Blue, $name, UC::Std);
+                            RED, $category, BLUE, $name, DEFAULT);
                         return;
                     }
                 }
@@ -414,7 +414,7 @@ impl State{
             else {
                 println!(
                     "{s}Could not parse wavetable from resource {b}\"{r}\"{s}, using default table!",
-                    s = UC::Std, b = UC::Blue, r = resource
+                    s = DEFAULT, b = BLUE, r = resource
                 );
                 WaveTable::default()
             };
@@ -458,13 +458,13 @@ impl State{
 
         self.g.set_output(&self.output_vertex);
         if !self.g.check_graph(){
-            println!("{}TermDaw: graph check failed!", UC::Red);
+            println!("{}TermDaw: graph check failed!", RED);
             return;
         }
 
         self.g.reset_normalize_vertices();
 
-        println!("{}Ok: refreshed.", UC::Green);
+        println!("{}Ok: refreshed.", GREEN);
         self.loaded = true;
     }
 
@@ -473,7 +473,7 @@ impl State{
     }
 
     pub fn render(&mut self) {
-        println!("{}Status: started rendering", UC::Std);
+        println!("{}Status: started rendering", DEFAULT);
         let psr = self.config.settings.project_samplerate();
         let bl = self.config.settings.buffer_length();
 
@@ -481,26 +481,26 @@ impl State{
         if psr > self.render_sr{
             println!(
                 "{y}TermDaw: warning: render will down sample from {b}{p}{y}(project s.r.) to {b}{r}{y}.",
-                y = UC::Yellow, b = UC::Blue, p = psr, r = self.render_sr
+                y = YELLOW, b = BLUE, p = psr, r = self.render_sr
             );
         }
         if msr > self.render_sr{
             println!(
                 "{y}TermDaw: warning: render will down sample from peak input quality({b}{m}{y}) to {b}{r}{y}.",
-                y = UC::Yellow, b = UC::Blue, m = msr, r = self.render_sr
+                y = YELLOW, b = BLUE, m = msr, r = self.render_sr
             );
         }
         if !(self.bd == 8 || self.bd == 16 || self.bd == 24 || self.bd == 32) {
             println!(
                 "{r}Bitdepth of {b}{bd}{r} not supported: choose bitdepth in {{8, 16, 24, 32}}.",
-                r = UC::Red, b = UC::Blue, bd = self.bd
+                r = RED, b = BLUE, bd = self.bd
             );
             return;
         }
         if mbd > self.bd{
             println!(
                 "{y}TermDaw: warning: render will lose bitdepth from peak input quality({b}{m}{y} bits) to {b}{bd}{y} bits",
-                y = UC::Yellow, b = UC::Blue,  m = mbd, bd = self.bd
+                y = YELLOW, b = BLUE,  m = mbd, bd = self.bd
             );
         }
         let spec = hound::WavSpec{
@@ -571,7 +571,7 @@ impl State{
             }
         }
         self.g.set_time(0);
-        println!("{}Ok: done rendering.", UC::Green);
+        println!("{}Ok: done rendering.", GREEN);
     }
 }
 

@@ -7,7 +7,8 @@ use std::{
     io::Cursor,
 };
 
-use term_basics_linux::*;
+use zen_colour::*;
+use term_basics_linux::{ input_field_simple, string_to_value };
 use skim::prelude::*;
 
 pub fn run_ui_workflow(
@@ -45,7 +46,7 @@ fn launch_ui_thread(
 
             if let Some(item) = selected_items.first(){
                 let command = item.output();
-                println!("{}---- {}", UC::Magenta, command);
+                println!("{}---- {}", MAGENTA, command);
                 let tmsg = if command == "quit" { UiThreadMsg::Quit }
                 else if command == "refresh" { UiThreadMsg::Refresh }
                 else if command == "render" { UiThreadMsg::Render }
@@ -57,18 +58,18 @@ fn launch_ui_thread(
                 else if command == "<prev" { UiThreadMsg::Prev }
                 else if command == "norm-vals" { UiThreadMsg::NormVals }
                 else if command == "set" {
-                    let raw = input_field();
+                    let raw = input_field_simple(true);
                     let time: Option<f32> = string_to_value(&raw);
                     if let Some(float) = time{
                         if float >= 0.0{
                             let t = (float * proj_sr as f32) as usize;
                             UiThreadMsg::Set(t)
                         } else {
-                            println!("{}Error: time needs to be positive.", UC::Red);
+                            println!("{}Error: time needs to be positive.", RED);
                             UiThreadMsg::None
                         }
                     } else {
-                        println!("{}Error: could not parse time, did not set time.", UC::Red);
+                        println!("{}Error: could not parse time, did not set time.", RED);
                         UiThreadMsg::None
                     }
                 }
@@ -76,7 +77,7 @@ fn launch_ui_thread(
                 else { UiThreadMsg::None };
                 transmit_to_main.send(tmsg).unwrap();
             } else {
-                println!("{}TermDaw: command not found!", UC::Red);
+                println!("{}TermDaw: command not found!", RED);
                 continue;
             }
             for received in &receive_in_ui{
@@ -100,7 +101,7 @@ fn ui_partner(
             macro_rules! check_loaded{
                 ($b:block) => {
                     if !state.loaded{
-                        println!("{}State not loaded!", UC::Red);
+                        println!("{}State not loaded!", RED);
                     } else {
                         $b;
                     }
@@ -179,7 +180,7 @@ fn ui_partner(
                         let t = state.g.get_time();
                         let tf = t as f32 / proj_sr as f32;
                         println!("{s}Frame: {b}{t}{s}, Time: {b}{tf}",
-                            s = UC::Std, b = UC::Blue, t = t, tf = tf);
+                            s = DEFAULT, b = BLUE, t = t, tf = tf);
                     });
                 }
                 UiThreadMsg::NormVals => {

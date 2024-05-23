@@ -7,7 +7,7 @@ use crate::{
 
 use std::collections::HashMap;
 
-use term_basics_linux::UC;
+use zen_colour::*;
 
 pub struct Graph{
     vertices: Vec<Vertex>,
@@ -82,12 +82,12 @@ impl Graph{
         let b_res = self.name_map.get(b);
         if a_res.is_none() {
             println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} cannot be found and thus can't be connected.",
-                y = UC::Yellow, b = UC::Blue, x = a);
+                y = YELLOW, b = BLUE, x = a);
             return false;
         }
         if b_res.is_none() {
             println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} cannot be found and thus can't be connected to.",
-                y = UC::Yellow, b = UC::Blue, x = b);
+                y = YELLOW, b = BLUE, x = b);
             return false;
         }
         let a_index = *a_res.unwrap();
@@ -150,11 +150,11 @@ impl Graph{
     pub fn check_graph(&self) -> bool{
         let output = if let Some(out) = self.output_vertex{ out }
         else {
-            println!("{}TermDaw: error: output vertex not found.", UC::Red);
+            println!("{}TermDaw: error: output vertex not found.", RED);
             return false;
         };
         if self.edges[output].is_empty() && self.vertices[output].has_input(){
-            println!("{}TermDaw: error: output receives no inputs.", UC::Red);
+            println!("{}TermDaw: error: output receives no inputs.", RED);
             return false;
         }
         let mut set = vec![false; self.vertices.len()];
@@ -168,7 +168,7 @@ impl Graph{
         for (i, x) in set.into_iter().enumerate(){
             if x { continue; }
             println!("{y}TermDaw: warning: vertex {b}\"{x}\"{y} does not reach output.",
-                y = UC::Yellow, b = UC::Blue, x = self.names[i]);
+                y = YELLOW, b = BLUE, x = self.names[i]);
         }
         true
     }
@@ -214,7 +214,7 @@ impl Graph{
         for (i, vertex) in self.vertices.iter().enumerate(){
             let nv = vertex.ext.get_normalization_value();
             if nv > 0.0 {
-                println!("{} {}: {}", UC::Magenta, self.names[i], nv);
+                println!("{} {}: {}", MAGENTA, self.names[i], nv);
             }
         }
     }

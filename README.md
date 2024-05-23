@@ -72,6 +72,7 @@ digital audio workstation that is friendly to automatization and algorithmic com
 - [ ] Disable completely dry vertices
 - [ ] Prune disabled vertices from the graph
 - [ ] Multithreading
+- [ ] Bounded normalization in absence of the lv2 feature
 
 ## Failed
 

@@ -1,6 +1,6 @@
 use mlua::prelude::*;
 use sdl2::audio::AudioSpecDesired;
-use term_basics_linux::*;
+use zen_colour::*;
 
 mod sample;
 mod graph;
@@ -46,7 +46,7 @@ fn main(){
     let config = Config::read(&wpath.join("project.toml"));
 
     println!("{s}TermDaw: loading {b}\"{x}\"{s} with \n\tbuffer_length = {b}{y}{s} \n\tproject_samplerate = {b}{z}{s} \n\tworkflow = {b}{w}{s} \n\tworkdir = {b}{v}{s} \n\tmain = {b}\"{u}\"{s}",
-        s = UC::Std, b = UC::Blue,
+        s = DEFAULT, b = BLUE,
         x = config.project.name(),
         y = config.settings.buffer_length(),
         z = config.settings.project_samplerate(),
@@ -59,8 +59,8 @@ fn main(){
         Ok(f) => f,
         Err(e) => {
             println!("{r}Error: could not open main lua file: {b}\"{x:#?}\"{r}.",
-                r = UC::Red, b = UC::Blue, x = main_path);
-            println!("{}\t{}", UC::Red, e);
+                r = RED, b = BLUE, x = main_path);
+            println!("{}\t{}", RED, e);
             return;
         }
     };
@@ -101,16 +101,16 @@ fn main(){
     let sdl_context = match sdl2::init(){
         Ok(x) => x,
         Err(e) => {
-            println!("{}Error: can't initialize sdl2 context.", UC::Red);
-            println!("{}\t{}", UC::Red, e);
+            println!("{}Error: can't initialize sdl2 context.", RED);
+            println!("{}\t{}", RED, e);
             return;
         }
     };
     let audio_subsystem = match sdl_context.audio(){
         Ok(x) => x,
         Err(e) => {
-            println!("{}Error: can't get sdl audio subsystem.", UC::Red);
-            println!("{}\t{}", UC::Red, e);
+            println!("{}Error: can't get sdl audio subsystem.", RED);
+            println!("{}\t{}", RED, e);
             return;
         }
     };
@@ -122,8 +122,8 @@ fn main(){
     let device = match audio_subsystem.open_queue::<f32, _>(None, &desired_spec){
         Ok(x) => x,
         Err(e) => {
-            println!("{}Error: can't open sdl audio queue.", UC::Red);
-            println!("{}\t{}", UC::Red, e);
+            println!("{}Error: can't open sdl audio queue.", RED);
+            println!("{}\t{}", RED, e);
             return;
         }
     };
