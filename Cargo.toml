@@ -13,7 +13,7 @@ lv2 = ["dep:lv2-host-minimal"]
 [dependencies]
 mlua = { version = "0.9.8", features = ["lua53", "vendored"] }
 hound = "3.5.1"
-rubato = "0.8.1" # to bump
+rubato = "0.15.0"
 toml = "0.8.13"
 serde = { version = "1.0.202", features = ["derive"] }
 skim = "0.10.4"

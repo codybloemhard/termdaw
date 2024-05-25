@@ -1,6 +1,8 @@
 use std::collections::{ HashMap, HashSet };
 
-use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction
+};
 use zen_colour::*;
 
 fn absmax(samples: &[f32]) -> f32{
@@ -145,26 +147,31 @@ impl Sample{
     }
 
     //Not for chunks!
-    pub fn resample(&self, from: usize, to: usize) -> Sample{
+    pub fn resample(&self, from: usize, to: usize) -> Result<Sample, String>{
         // no idea what is means but comes from the example lol
-        let params = InterpolationParameters {
+        let params = SincInterpolationParameters {
             sinc_len: 256,
             f_cutoff: 0.95,
-            interpolation: InterpolationType::Nearest,
-            oversampling_factor: 160,
+            interpolation: SincInterpolationType::Linear,
+            oversampling_factor: 256,
             window: WindowFunction::BlackmanHarris2,
         };
-        let mut resampler = SincFixedIn::<f32>::new(
+        let resampler = SincFixedIn::<f32>::new(
             to as f64 / from as f64,
+            1.0,
             params, self.len(), 2
         );
+        let mut resampler = match resampler {
+            Ok(r) => r,
+            Err(_) => return Err(String::from("error: sample: could not construct hound resampler.")),
+        };
         let waves_in = vec![self.l.clone(), self.r.clone()];
-        let mut waves_out = resampler.process(&waves_in).unwrap();
+        let mut waves_out = resampler.process(&waves_in, None).unwrap();
         let l = std::mem::take(&mut waves_out[0]);
         let r = std::mem::take(&mut waves_out[1]);
-        Self{
+        Ok(Self{
             l, r
-        }
+        })
     }
 
     pub fn interleave(self) -> Vec<f32>{
@@ -296,7 +303,10 @@ impl SampleBank{
         }
         // resampling
         if sr != self.sample_rate{ // need to resample
-            sample = sample.resample(sr, self.sample_rate);
+            match sample.resample(sr, self.sample_rate) {
+                Ok(s) => sample = s,
+                Err(e) => return Err(e),
+            }
         }
         self.samples.push(sample);
         self.names.insert(name, self.samples.len() - 1);

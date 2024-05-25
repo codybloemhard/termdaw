@@ -10,7 +10,9 @@ use crate::{
     lv2::*,
 };
 
-use rubato::{ Resampler, SincFixedIn, InterpolationType, InterpolationParameters, WindowFunction };
+use rubato::{
+    Resampler, SincFixedIn, SincInterpolationType, SincInterpolationParameters, WindowFunction
+};
 use fnrs::vecs;
 use mlua::prelude::*;
 use sampsyn::*;
@@ -529,23 +531,23 @@ impl State{
             }
         }
         if psr > self.render_sr{
-            let params = InterpolationParameters {
+            let params = SincInterpolationParameters {
                 sinc_len: 256,
                 f_cutoff: 0.95,
-                interpolation: InterpolationType::Nearest,
-                oversampling_factor: 160,
+                interpolation: SincInterpolationType::Linear,
+                oversampling_factor: 256,
                 window: WindowFunction::BlackmanHarris2,
             };
             let mut resampler = SincFixedIn::<f32>::new(
                 self.render_sr as f64 / psr as f64,
-                params, bl, 2
-            );
+                1.0, params, bl, 2
+            ).expect("error: render: could not construct hound resampler");
             for _ in 0..self.cs{
                 let chunk = self.g.render(&self.sb, &mut self.fb, &mut self.host);
                 if chunk.is_none() { continue; }
                 let chunk = chunk.unwrap();
                 let waves_in = vec![chunk.l.clone(), chunk.r.clone()];
-                let waves_out = resampler.process(&waves_in).unwrap();
+                let waves_out = resampler.process(&waves_in, None).unwrap();
                 if self.bd > 16 {
                     write_32s(
                         &mut writer, &waves_out[0], &waves_out[1], waves_out[0].len(), amplitude
